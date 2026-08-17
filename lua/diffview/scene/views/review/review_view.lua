@@ -41,11 +41,11 @@ function ReviewView:selection_revisions()
   local label
 
   if range.current then
-    label = "HEAD -> WORKING TREE"
+    label = "HEAD..WORKING TREE"
   elseif range.editable then
-    label = ("%s -> WORKING TREE"):format(left:abbrev(7))
+    label = ("%s..WORKING TREE"):format(left:abbrev(7))
   else
-    label = ("%s -> %s"):format(left:abbrev(7), right:abbrev(7))
+    label = ("%s..%s"):format(left:abbrev(7), right:abbrev(7))
   end
 
   return left, right, label

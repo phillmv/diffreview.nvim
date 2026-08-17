@@ -21,8 +21,8 @@ local M = {}
 ---@class ReviewSelection : diffview.Object
 ---@field commits ReviewCommit[]
 ---@field head string
----@field first? integer
----@field last? integer
+---@field first integer
+---@field last integer
 ---@field anchor? integer
 local ReviewSelection = oop.create_class("ReviewSelection")
 
@@ -33,17 +33,14 @@ function ReviewSelection:init(commits, default_count)
 
   self.commits = commits
   self.head = commits[1].hash
-
-  if default_count and default_count > 0 then
-    self.first = 1
-    self.last = math.min(default_count, #commits)
-  end
+  self.first = 0
+  self.last = math.min(default_count or 0, #commits)
 end
 
 ---@param index integer
 ---@return integer
 function ReviewSelection:clamp(index)
-  return math.max(1, math.min(index, #self.commits))
+  return math.max(0, math.min(index, #self.commits))
 end
 
 ---@param first integer
@@ -65,14 +62,9 @@ function ReviewSelection:cancel()
   self.anchor = nil
 end
 
----@return boolean
-function ReviewSelection:has_selection()
-  return self.first ~= nil and self.last ~= nil
-end
-
 ---@param cursor integer
----@return integer? first
----@return integer? last
+---@return integer first
+---@return integer last
 function ReviewSelection:pending(cursor)
   if not self.anchor then
     return self.first, self.last
@@ -84,15 +76,18 @@ end
 
 ---@return ReviewRange
 function ReviewSelection:range()
-  if not self:has_selection() then
+  if self.first == 0 and self.last == 0 then
     return {
+      first = 0,
+      last = 0,
       base = self.head,
       editable = true,
       current = true,
     }
   end
 
-  local newest = self.commits[self.first]
+  local editable = self.first == 0
+  local newest = self.commits[editable and 1 or self.first]
   local oldest = self.commits[self.last]
 
   return {
@@ -101,7 +96,7 @@ function ReviewSelection:range()
     newest = newest,
     oldest = oldest,
     base = oldest.parent,
-    editable = newest.hash == self.head,
+    editable = editable,
     current = false,
   }
 end

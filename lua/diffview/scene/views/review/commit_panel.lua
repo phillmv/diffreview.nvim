@@ -82,7 +82,13 @@ function ReviewCommitPanel:setup_buffer()
 end
 
 function ReviewCommitPanel:update_components()
-  local commits = { name = "commits" }
+  local commits = {
+    name = "commits",
+    {
+      name = "commit",
+      context = { index = 0, working_tree = true },
+    },
+  }
   for i, commit in ipairs(self.selection.commits) do
     commits[#commits + 1] = {
       name = "commit",
@@ -108,7 +114,7 @@ end
 function ReviewCommitPanel:highlight_selection()
   if not self:is_open() then return end
 
-  local target = self.selection.last or 1
+  local target = self.selection.last
   for _, item in ipairs(self.components.commits) do
     if item.comp.context.index == target then
       pcall(api.nvim_win_set_cursor, self.winid, { item.comp.lstart + 1, 0 })
@@ -121,7 +127,7 @@ end
 function ReviewCommitPanel:move_cursor(offset)
   if not self:is_open() then return end
 
-  local index = self:get_index_at_cursor() or self.selection.last or 1
+  local index = self:get_index_at_cursor() or self.selection.last
   index = self.selection:clamp(index + offset)
 
   for _, item in ipairs(self.components.commits) do
@@ -139,13 +145,13 @@ end
 function ReviewCommitPanel:render()
   if not self.render_data then return end
 
-  local cursor = self:get_index_at_cursor() or self.selection.last or 1
+  local cursor = self:get_index_at_cursor() or self.selection.last
   self.render_data:clear()
   local width = self:infer_width()
   local first, last = self.selection:pending(cursor)
   local pending = self.selection.anchor ~= nil
   local range = self.selection:range()
-  local editable = pending and first == 1 or not pending and range.editable
+  local editable = pending and first == 0 or not pending and range.editable
 
   local header = self.components.header.comp
   header:add_text("Commits ", "DiffviewFilePanelTitle")
@@ -158,17 +164,26 @@ function ReviewCommitPanel:render()
 
   for _, item in ipairs(self.components.commits) do
     local ctx = item.comp.context
-    local commit = ctx.commit
     local selected = first and ctx.index >= first and ctx.index <= last
     local marker = selected and (pending and "+" or "*") or " "
-    local head = ctx.index == 1 and "@" or " "
 
-    item.comp:add_text(marker .. head .. " ", selected and "DiffviewFilePanelSelected" or nil)
-    item.comp:add_text(commit.hash:sub(1, 7) .. " ", hl.get_git_hl("M"))
-    item.comp:add_line(
-      truncate(commit.subject, math.max(1, width - 13)),
-      selected and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
-    )
+    if ctx.working_tree then
+      item.comp:add_text(marker .. "  ", selected and "DiffviewFilePanelSelected" or nil)
+      item.comp:add_line(
+        "WORKING TREE",
+        selected and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
+      )
+    else
+      local commit = ctx.commit
+      local head = ctx.index == 1 and "@" or " "
+
+      item.comp:add_text(marker .. head .. " ", selected and "DiffviewFilePanelSelected" or nil)
+      item.comp:add_text(commit.hash:sub(1, 7) .. " ", hl.get_git_hl("M"))
+      item.comp:add_line(
+        truncate(commit.subject, math.max(1, width - 13)),
+        selected and "DiffviewFilePanelSelected" or "DiffviewFilePanelFileName"
+      )
+    end
   end
 end
 

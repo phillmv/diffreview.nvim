@@ -86,10 +86,11 @@ the working tree. Passing a count selects that many recent commits. The left
 sidebar contains the changed files above a commit list.
 
 In the commit list, press `v` to anchor a range, move with `j`/`k`, then press
-`<CR>` to apply it. A range ending at `HEAD` compares its base against the
-working tree, so the right-hand buffers are editable and writes are saved
-locally. Historical ranges compare two committed trees and are read-only.
-Existing working-tree changes are included in editable reviews.
+`<CR>` to apply it. `WORKING TREE` is a selectable boundary above the commit
+at `HEAD`: selecting it alone shows current changes, while including it in a
+commit range makes the review editable and includes existing working-tree
+changes. Commit-only ranges show the patches introduced by those commits and
+are read-only.
 
 ## Usage
 
@@ -139,8 +140,8 @@ index will be updated.
 
 With no count, opens the current changes from `HEAD` to the working tree.
 Passing `[count]` opens a combined diff for that many latest first-parent
-commits. Select another contiguous range from the commit panel with `v`,
-`j`/`k`, and `<CR>`.
+commits through `WORKING TREE`. Select another contiguous range from the
+commit panel with `v`, `j`/`k`, and `<CR>`.
 
 ### `:[range]DiffviewFileHistory [paths] [options]`
 

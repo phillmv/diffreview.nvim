@@ -173,13 +173,15 @@ COMMANDS                                        *diffview-commands*
         commit panel, press `v` to anchor a range, move with `j` or `k`, then
         press <CR> to apply the range. Press <Esc> to cancel a pending range.
 
-        When the newest selected commit is HEAD, the diff compares the parent
-        of the oldest selected commit against the working tree. The right-hand
-        buffers are real local buffers and can be edited and written normally.
-        Existing working-tree changes are intentionally included.
+        WORKING TREE is a selectable boundary above the commit at HEAD.
+        Selecting it alone shows current changes. Including it in a commit
+        range compares the parent of the oldest selected commit against the
+        working tree. The right-hand buffers are real local buffers and can be
+        edited and written normally. Existing working-tree changes are
+        intentionally included.
 
-        When the newest selected commit is not HEAD, the diff compares the
-        committed trees at the range boundaries. Both sides are read-only.
+        Commit-only ranges show the patches introduced by the selected
+        commits. Both sides are read-only.
 
         Only Git repositories are currently supported.
 
