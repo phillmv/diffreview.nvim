@@ -153,6 +153,25 @@ return function(panel)
     comp:add_line()
   end
 
+  if panel.rev_pretty_name or (panel.path_args and #panel.path_args > 0) then
+    comp = panel.components.info.title.comp
+    comp:add_line("Showing changes for:", "DiffviewFilePanelTitle")
+
+    comp = panel.components.info.entries.comp
+
+    if panel.rev_pretty_name then
+      comp:add_line(pl:truncate(panel.rev_pretty_name, width - 5), "DiffviewFilePanelPath")
+    end
+
+    for _, arg in ipairs(panel.path_args or {}) do
+      local relpath = pl:relative(arg, panel.adapter.ctx.toplevel)
+      if relpath == "" then relpath = "." end
+      comp:add_line(pl:truncate(relpath, width - 5), "DiffviewFilePanelPath")
+    end
+
+    panel.components.info.margin.comp:add_line()
+  end
+
   if #panel.files.conflicting > 0 then
     comp = panel.components.conflicting.title.comp
     comp:add_text("Conflicts ", "DiffviewFilePanelTitle")
@@ -187,18 +206,4 @@ return function(panel)
     panel.components.staged.margin.comp:add_line()
   end
 
-  if panel.rev_pretty_name or (panel.path_args and #panel.path_args > 0) then
-    local extra_info = utils.vec_join({ panel.rev_pretty_name }, panel.path_args or {})
-
-    comp = panel.components.info.title.comp
-    comp:add_line("Showing changes for:", "DiffviewFilePanelTitle")
-
-    comp = panel.components.info.entries.comp
-
-    for _, arg in ipairs(extra_info) do
-      local relpath = pl:relative(arg, panel.adapter.ctx.toplevel)
-      if relpath == "" then relpath = "." end
-      comp:add_line(pl:truncate(relpath, width - 5), "DiffviewFilePanelPath")
-    end
-  end
 end

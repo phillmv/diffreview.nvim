@@ -161,6 +161,32 @@ COMMANDS                                        *diffview-commands*
                         file. If the path doesn't match any of the files in
                         the initial set of files, this option does nothing.
 
+                                                *:DiffviewReview*
+:DiffviewReview [count] [-C{path}]
+
+        Opens an aggregate diff alongside the repository's first-parent
+        history. With no [count], the initial diff shows the current changes
+        from HEAD to the working tree. Passing [count] initially selects that
+        many recent commits.
+
+        The left sidebar contains a file panel above a commit panel. In the
+        commit panel, press `v` to anchor a range, move with `j` or `k`, then
+        press <CR> to apply the range. Press <Esc> to cancel a pending range.
+
+        When the newest selected commit is HEAD, the diff compares the parent
+        of the oldest selected commit against the working tree. The right-hand
+        buffers are real local buffers and can be edited and written normally.
+        Existing working-tree changes are intentionally included.
+
+        When the newest selected commit is not HEAD, the diff compares the
+        committed trees at the range boundaries. Both sides are read-only.
+
+        Only Git repositories are currently supported.
+
+        Options: ~
+            -C{path}    Run as if Git was started in {path} instead of the
+                        current working directory.
+
                                                 *:DiffviewFileHistory*
 :[range]DiffviewFileHistory [paths] [options]
 

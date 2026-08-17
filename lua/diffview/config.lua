@@ -106,6 +106,12 @@ M.defaults = {
       win_opts = {}
     },
   },
+  review_panel = {
+    default_count = 0,
+    max_count = 100,
+    height = 12,
+    win_opts = {},
+  },
   commit_log_panel = {
     win_config = {
       win_opts = {}
@@ -114,6 +120,7 @@ M.defaults = {
   default_args = {
     DiffviewOpen = {},
     DiffviewFileHistory = {},
+    DiffviewReview = {},
   },
   hooks = {},
   -- Tabularize formatting pattern: `\v(\"[^"]{-}\",\ze(\s*)actions)|actions\.\w+(\(.{-}\))?,?|\{\ desc\ \=`
@@ -245,6 +252,16 @@ M.defaults = {
       { "n", "<leader>b",     actions.toggle_files,                { desc = "Toggle the file panel" } },
       { "n", "g<C-x>",        actions.cycle_layout,                { desc = "Cycle available layouts" } },
       { "n", "g?",            actions.help("file_history_panel"),  { desc = "Open the help panel" } },
+    },
+    review_panel = {
+      { "n", "j",          actions.review_next_commit, { desc = "Move to the next commit" } },
+      { "n", "<down>",     actions.review_next_commit, { desc = "Move to the next commit" } },
+      { "n", "k",          actions.review_prev_commit, { desc = "Move to the previous commit" } },
+      { "n", "<up>",       actions.review_prev_commit, { desc = "Move to the previous commit" } },
+      { "n", "v",          actions.review_anchor, { desc = "Anchor a commit range" } },
+      { "n", "<cr>",       actions.review_apply,  { desc = "Apply the selected commit range" } },
+      { "n", "<esc>",      actions.review_cancel, { desc = "Cancel the pending commit range" } },
+      { "n", "<leader>e",  actions.focus_files,   { desc = "Bring focus to the file panel" } },
     },
     option_panel = {
       { "n", "<tab>", actions.select_entry,          { desc = "Change the current option" } },

@@ -1308,6 +1308,45 @@ function GitAdapter:head_rev()
   return GitRev(RevType.COMMIT, s, true)
 end
 
+---@param max_count integer
+---@return string? err
+---@return ReviewCommit[]? commits
+function GitAdapter:review_commits(max_count)
+  local out, code, err = self:exec_sync({
+    "log",
+    "--first-parent",
+    "--max-count=" .. max_count,
+    "--format=%H%x1f%P%x1f%an%x1f%ar%x1f%s",
+    "HEAD",
+    "--",
+  }, {
+    cwd = self.ctx.toplevel,
+    retry = 2,
+  })
+
+  if code ~= 0 then
+    return table.concat(err or {}, "\n"), nil
+  end
+
+  local commits = {}
+  for _, line in ipairs(out) do
+    local fields = vim.split(line, "\31", { plain = true })
+    if #fields ~= 5 then
+      return "Failed to parse Git commit data.", nil
+    end
+
+    commits[#commits + 1] = {
+      hash = fields[1],
+      parent = fields[2]:match("^[^ ]+"),
+      author = fields[3],
+      rel_date = fields[4],
+      subject = fields[5],
+    }
+  end
+
+  return nil, commits
+end
+
 ---@param path string
 ---@param rev_arg string?
 ---@return string?

@@ -3,7 +3,6 @@ local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileEntry = lazy.access("diffview.scene.file_entry", "FileEntry") ---@type FileEntry|LazyModule
-local FilePanel = lazy.access("diffview.scene.views.diff.file_panel", "FilePanel") ---@type FilePanel|LazyModule
 local Rev = lazy.access("diffview.vcs.adapters.git.rev", "GitRev") ---@type GitRev|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local vcs_utils = lazy.require("diffview.vcs") ---@module "diffview.vcs"
@@ -60,12 +59,6 @@ function CDiffView:init(opt)
 
   self:super(vim.tbl_extend("force", opt, {
     adapter = adapter,
-    panel = FilePanel(
-      adapter,
-      self.files,
-      self.path_args,
-      self.rev_arg or adapter:rev_to_pretty_string(opt.left, opt.right)
-    ),
   }))
 
   if type(opt.files) == "table" and not vim.tbl_isempty(opt.files) then

@@ -147,6 +147,12 @@ function FilePanel:update_components()
   self.components = self.render_data:create_component({
     { name = "path" },
     {
+      name = "info",
+      { name = "title" },
+      { name = "entries" },
+      { name = "margin" },
+    },
+    {
       name = "conflicting",
       { name = "title" },
       conflicting_files,
@@ -163,11 +169,6 @@ function FilePanel:update_components()
       { name = "title" },
       staged_files,
       { name = "margin" },
-    },
-    {
-      name = "info",
-      { name = "title" },
-      { name = "entries" },
     },
   })
 

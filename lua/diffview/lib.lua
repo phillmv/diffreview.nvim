@@ -2,7 +2,11 @@ local lazy = require("diffview.lazy")
 
 local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local FileHistoryView = lazy.access("diffview.scene.views.file_history.file_history_view", "FileHistoryView") ---@type FileHistoryView|LazyModule
+local ReviewSelection = lazy.access("diffview.scene.views.review.selection", "ReviewSelection") ---@type ReviewSelection|LazyModule
+local ReviewView = lazy.access("diffview.scene.views.review.review_view", "ReviewView") ---@type ReviewView|LazyModule
 local StandardView = lazy.access("diffview.scene.views.standard.standard_view", "StandardView") ---@type StandardView|LazyModule
+local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
+local GitAdapter = lazy.access("diffview.vcs.adapters.git", "GitAdapter") ---@type GitAdapter|LazyModule
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
@@ -10,6 +14,7 @@ local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 
 local api = vim.api
 local logger = DiffviewGlobal.logger
+local pl = lazy.access(utils, "path") ---@type PathLib
 
 local M = {}
 
@@ -107,6 +112,77 @@ function M.file_history(range, args)
 
   table.insert(M.views, v)
   logger:debug("FileHistoryView instantiation successful!")
+
+  return v
+end
+
+---@param args string[]
+function M.review(args)
+  local default_args = config.get_config().default_args.DiffviewReview
+  local argo = arg_parser.parse(utils.flatten({ default_args, args }))
+  local count = tonumber(argo.args[1] or config.get_config().review_panel.default_count)
+
+  if #argo.args > 1 or not count or count < 0 or count % 1 ~= 0 then
+    utils.err("DiffviewReview expects a non-negative integer commit count.")
+    return
+  end
+
+  local err, adapter = vcs.get_adapter({
+    cmd_ctx = {
+      path_args = {},
+      cpath = argo:get_flag("C", { no_empty = true, expand = true }),
+    },
+  })
+
+  if err then
+    utils.err(err)
+    return
+  end
+
+  ---@cast adapter -?
+  if not adapter:instanceof(GitAdapter.__get()) then
+    utils.err("DiffviewReview currently supports Git repositories only.")
+    return
+  end
+
+  local max_count = math.max(count, config.get_config().review_panel.max_count)
+  local log_err, commits = adapter:review_commits(max_count)
+  if log_err then
+    utils.err("Failed to load commits for DiffviewReview: " .. log_err)
+    return
+  elseif not commits or #commits == 0 then
+    utils.err("DiffviewReview requires a repository with at least one commit.")
+    return
+  end
+
+  local selection = ReviewSelection(commits, count)
+  local range = selection:range()
+  local left = range.base
+      and adapter.Rev(RevType.COMMIT, range.base)
+      or adapter.Rev.new_null_tree()
+  local right = adapter.Rev(RevType.LOCAL)
+  local label = range.current
+      and "HEAD -> WORKING TREE"
+      or ("%s -> WORKING TREE"):format(left:abbrev(7))
+
+  local v = ReviewView({
+    adapter = adapter,
+    selection = selection,
+    rev_arg = label,
+    path_args = {},
+    left = left,
+    right = right,
+    options = {
+      selected_file = vim.bo.buftype == "" and pl:vim_expand("%:p") or nil,
+    },
+  })
+
+  if not v:is_valid() then
+    return
+  end
+
+  table.insert(M.views, v)
+  logger:debug("ReviewView instantiation successful!")
 
   return v
 end

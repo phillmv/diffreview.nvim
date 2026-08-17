@@ -142,6 +142,14 @@ function M.file_history(range, args)
   end
 end
 
+---@param args string[]
+function M.review(args)
+  local view = lib.review(args)
+  if view then
+    view:open()
+  end
+end
+
 function M.close(tabpage)
   if tabpage then
     vim.schedule(function()

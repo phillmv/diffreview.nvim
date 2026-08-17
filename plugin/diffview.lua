@@ -34,6 +34,10 @@ command("DiffviewFileHistory", function(ctx)
   diffview.file_history(range, arg_parser.scan(ctx.args).args)
 end, { nargs = "*", complete = completion, range = true })
 
+command("DiffviewReview", function(ctx)
+  diffview.review(arg_parser.scan(ctx.args).args)
+end, { nargs = "*" })
+
 command("DiffviewClose", function()
   diffview.close()
 end, { nargs = 0, bang = true })

@@ -58,6 +58,7 @@ function DiffView:init(opt)
   self.left = opt.left
   self.right = opt.right
   self.initialized = false
+  self.update_generation = 0
   self.options = opt.options or {}
   self.options.selected_file = self.options.selected_file
     and pl:chain(self.options.selected_file)
@@ -66,17 +67,22 @@ function DiffView:init(opt)
         :get()
 
   self:super({
-    panel = FilePanel(
-      self.adapter,
-      self.files,
-      self.path_args,
-      self.rev_arg or self.adapter:rev_to_pretty_string(self.left, self.right)
-    ),
+    panel = opt.panel or self:create_file_panel(),
   })
 
   self.attached_bufs = {}
   self.emitter:on("file_open_post", utils.bind(self.file_open_post, self))
   self.valid = true
+end
+
+---@return FilePanel
+function DiffView:create_file_panel()
+  return FilePanel(
+    self.adapter,
+    self.files,
+    self.path_args,
+    self.rev_arg or self.adapter:rev_to_pretty_string(self.left, self.right)
+  )
 end
 
 function DiffView:post_open()
@@ -326,6 +332,7 @@ DiffView.update_files = debounce.debounce_trailing(
   ---@param callback fun(err?: string[])
   async.wrap(function(self, callback)
     await(async.scheduler())
+    local update_generation = self.update_generation
 
     -- Never update unless the view is in focus
     if self.tabpage ~= api.nvim_get_current_tabpage() then
@@ -354,6 +361,16 @@ DiffView.update_files = debounce.debounce_trailing(
     ---@type string[]?, FileDict
     local err, new_files = await(self:get_updated_files())
     await(async.scheduler())
+
+    if update_generation ~= self.update_generation then
+      if new_files then
+        for _, file in new_files:iter() do
+          file:destroy()
+        end
+      end
+      callback({ "The update was superseded." })
+      return
+    end
 
     if err then
       utils.err("Failed to update files in a diff view!", true)
@@ -496,6 +513,40 @@ DiffView.update_files = debounce.debounce_trailing(
     callback()
   end)
 )
+
+---@param left Rev
+---@param right Rev
+---@param rev_arg? string
+---@param callback? fun(err?: string[])
+function DiffView:set_revisions(left, right, rev_arg, callback)
+  local selected_path = self.panel.cur_file and self.panel.cur_file.path
+
+  self.update_generation = self.update_generation + 1
+  self.left = left
+  self.right = right
+  self.rev_arg = rev_arg
+  self.options.selected_file = selected_path
+  self.initialized = false
+
+  self.panel:set_cur_file(nil)
+  for _, file in self.files:iter() do
+    file:destroy()
+  end
+  self.cur_entry = nil
+  self.files:set_conflicting({})
+  self.files:set_working({})
+  self.files:set_staged({})
+  self.files:update_file_trees()
+
+  self.panel.rev_pretty_name = rev_arg
+  if self.panel:buf_loaded() then
+    self.panel:update_components()
+    self.panel:render()
+    self.panel:redraw()
+  end
+
+  self:update_files(callback)
+end
 
 ---Ensures there are files to load, and loads the null buffer otherwise.
 ---@return boolean

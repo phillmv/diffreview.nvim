@@ -78,6 +78,19 @@ Get started by opening file history for:
 
 For more info, see `:h :DiffviewFileHistory`.
 
+## Commit Review
+
+`:DiffviewReview [count]` opens an aggregate diff alongside the repository's
+first-parent history. With no count it shows the current changes from `HEAD` to
+the working tree. Passing a count selects that many recent commits. The left
+sidebar contains the changed files above a commit list.
+
+In the commit list, press `v` to anchor a range, move with `j`/`k`, then press
+`<CR>` to apply it. A range ending at `HEAD` compares its base against the
+working tree, so the right-hand buffers are editable and writes are saved
+locally. Historical ranges compare two committed trees and are read-only.
+Existing working-tree changes are included in editable reviews.
+
 ## Usage
 
 ### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`
@@ -121,6 +134,13 @@ You can stage individual hunks by editing any buffer that represents the index
 will have the index buffer on the left side, and the entries under "Staged
 changes" will have it on the right side). Once you write to an index buffer the
 index will be updated.
+
+### `:DiffviewReview [count]`
+
+With no count, opens the current changes from `HEAD` to the working tree.
+Passing `[count]` opens a combined diff for that many latest first-parent
+commits. Select another contiguous range from the commit panel with `v`,
+`j`/`k`, and `<CR>`.
 
 ### `:[range]DiffviewFileHistory [paths] [options]`
 
@@ -261,12 +281,19 @@ require("diffview").setup({
       win_opts = {},
     },
   },
+  review_panel = {
+    default_count = 0,
+    max_count = 100,
+    height = 12,
+    win_opts = {},
+  },
   commit_log_panel = {
     win_config = {},  -- See |diffview-config-win_config|
   },
   default_args = {    -- Default args prepended to the arg-list for the listed commands
     DiffviewOpen = {},
     DiffviewFileHistory = {},
+    DiffviewReview = {},
   },
   hooks = {},         -- See |diffview-config-hooks|
   keymaps = {
@@ -396,6 +423,16 @@ require("diffview").setup({
       { "n", "<leader>b",     actions.toggle_files,                { desc = "Toggle the file panel" } },
       { "n", "g<C-x>",        actions.cycle_layout,                { desc = "Cycle available layouts" } },
       { "n", "g?",            actions.help("file_history_panel"),  { desc = "Open the help panel" } },
+    },
+    review_panel = {
+      { "n", "j",          actions.review_next_commit, { desc = "Move to the next commit" } },
+      { "n", "<down>",     actions.review_next_commit, { desc = "Move to the next commit" } },
+      { "n", "k",          actions.review_prev_commit, { desc = "Move to the previous commit" } },
+      { "n", "<up>",       actions.review_prev_commit, { desc = "Move to the previous commit" } },
+      { "n", "v",          actions.review_anchor,      { desc = "Anchor a commit range" } },
+      { "n", "<cr>",       actions.review_apply,       { desc = "Apply the selected commit range" } },
+      { "n", "<esc>",      actions.review_cancel,      { desc = "Cancel the pending commit range" } },
+      { "n", "<leader>e",  actions.focus_files,        { desc = "Bring focus to the file panel" } },
     },
     option_panel = {
       { "n", "<tab>", actions.select_entry,          { desc = "Change the current option" } },
