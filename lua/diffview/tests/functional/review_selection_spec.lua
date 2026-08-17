@@ -60,6 +60,54 @@ describe("ReviewSelection", function()
     eq(false, range.editable)
   end)
 
+  it("extends an editable selection through a new HEAD", function()
+    local selection = ReviewSelection(commits, 2)
+    local refreshed = {
+      { hash = "new-head", parent = "head" },
+      unpack(commits),
+    }
+
+    eq(true, selection:reconcile(refreshed))
+    local range = selection:range()
+    eq(0, range.first)
+    eq(3, range.last)
+    eq("new-head", range.newest.hash)
+    eq("two", range.oldest.hash)
+    eq("three", range.base)
+    eq(true, range.editable)
+  end)
+
+  it("preserves a historical selection by commit identity", function()
+    local selection = ReviewSelection(commits, 0)
+    selection:apply(2, 4)
+    local refreshed = {
+      { hash = "new-head", parent = "head" },
+      unpack(commits),
+    }
+
+    eq(true, selection:reconcile(refreshed))
+    local range = selection:range()
+    eq(3, range.first)
+    eq(5, range.last)
+    eq("two", range.newest.hash)
+    eq("four", range.oldest.hash)
+    eq(false, range.editable)
+  end)
+
+  it("rejects refreshed history that no longer contains the selection", function()
+    local selection = ReviewSelection(commits, 0)
+    selection:apply(2, 3)
+
+    eq(false, selection:reconcile({
+      { hash = "rewritten", parent = "root" },
+      { hash = "root" },
+    }))
+
+    local range = selection:range()
+    eq("two", range.newest.hash)
+    eq("three", range.oldest.hash)
+  end)
+
   it("tracks and cancels a pending range", function()
     local selection = ReviewSelection(commits, 2)
     selection:begin(2)

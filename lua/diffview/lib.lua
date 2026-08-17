@@ -162,8 +162,8 @@ function M.review(args)
       or adapter.Rev.new_null_tree()
   local right = adapter.Rev(RevType.LOCAL)
   local label = range.current
-      and "HEAD -> WORKING TREE"
-      or ("%s -> WORKING TREE"):format(left:abbrev(7))
+      and "HEAD..WORKING TREE"
+      or ("%s..WORKING TREE"):format(left:abbrev(7))
 
   local v = ReviewView({
     adapter = adapter,

@@ -92,6 +92,10 @@ commit range makes the review editable and includes existing working-tree
 changes. Commit-only ranges show the patches introduced by those commits and
 are read-only.
 
+`:DiffviewRefresh` reloads the commit list and changed files. Selections are
+preserved by commit identity; ranges through `WORKING TREE` extend through a
+new `HEAD`.
+
 ## Usage
 
 ### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`

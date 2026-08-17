@@ -29,12 +29,55 @@ local ReviewSelection = oop.create_class("ReviewSelection")
 ---@param commits ReviewCommit[]
 ---@param default_count? integer
 function ReviewSelection:init(commits, default_count)
+  self:reset(commits, default_count)
+end
+
+---@param commits ReviewCommit[]
+---@param default_count? integer
+function ReviewSelection:reset(commits, default_count)
   assert(#commits > 0, "Review selection requires at least one commit!")
 
   self.commits = commits
   self.head = commits[1].hash
   self.first = 0
   self.last = math.min(default_count or 0, #commits)
+  self.anchor = nil
+end
+
+---@param commits ReviewCommit[]
+---@return boolean preserved
+function ReviewSelection:reconcile(commits)
+  assert(#commits > 0, "Review selection requires at least one commit!")
+
+  local range = self:range()
+  local by_hash = {}
+  for i, commit in ipairs(commits) do
+    by_hash[commit.hash] = i
+  end
+
+  local first
+  local last
+  if range.current then
+    first = 0
+    last = 0
+  elseif range.editable then
+    first = 0
+    last = by_hash[range.oldest.hash]
+  else
+    first = by_hash[range.newest.hash]
+    last = by_hash[range.oldest.hash]
+  end
+
+  if first == nil or last == nil or first > last then
+    return false
+  end
+
+  self.commits = commits
+  self.head = commits[1].hash
+  self.first = first
+  self.last = last
+  self.anchor = nil
+  return true
 end
 
 ---@param index integer

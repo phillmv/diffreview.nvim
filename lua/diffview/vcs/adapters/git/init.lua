@@ -1309,9 +1309,26 @@ function GitAdapter:head_rev()
 end
 
 ---@param max_count integer
+---@param include_hash? string
 ---@return string? err
 ---@return ReviewCommit[]? commits
-function GitAdapter:review_commits(max_count)
+function GitAdapter:review_commits(max_count, include_hash)
+  if include_hash then
+    local count_out, count_code = self:exec_sync({
+      "rev-list",
+      "--first-parent",
+      "--count",
+      include_hash .. "..HEAD",
+    }, {
+      cwd = self.ctx.toplevel,
+      retry = 2,
+    })
+    local include_count = count_code == 0 and tonumber(count_out[1])
+    if include_count then
+      max_count = math.max(max_count, include_count + 1)
+    end
+  end
+
   local out, code, err = self:exec_sync({
     "log",
     "--first-parent",

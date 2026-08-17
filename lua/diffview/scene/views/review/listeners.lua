@@ -1,5 +1,8 @@
 return function(view)
   return {
+    refresh_files = function()
+      view:refresh()
+    end,
     review_anchor = function()
       local index = view.panel.commit_panel:get_index_at_cursor()
       if index then

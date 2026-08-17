@@ -183,6 +183,10 @@ COMMANDS                                        *diffview-commands*
         Commit-only ranges show the patches introduced by the selected
         commits. Both sides are read-only.
 
+        :DiffviewRefresh reloads both the commit list and changed files.
+        Selections are preserved by commit identity; ranges through WORKING
+        TREE extend through a new HEAD.
+
         Only Git repositories are currently supported.
 
         Options: ~
