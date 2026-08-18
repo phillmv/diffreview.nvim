@@ -108,6 +108,48 @@ describe("ReviewSelection", function()
     eq("three", range.oldest.hash)
   end)
 
+  it("restores a persisted editable range by hash", function()
+    local selection = ReviewSelection(commits, 0)
+    local refreshed = {
+      { hash = "new-head", parent = "head" },
+      unpack(commits),
+    }
+
+    eq(true, selection:restore(refreshed, {
+      current = false,
+      includes_working_tree = true,
+      newest_oid = "head",
+      oldest_oid = "three",
+    }))
+
+    local range = selection:range()
+    eq(0, range.first)
+    eq(4, range.last)
+    eq("new-head", range.newest.hash)
+    eq("three", range.oldest.hash)
+    eq(true, range.editable)
+  end)
+
+  it("restores current changes against the new HEAD", function()
+    local selection = ReviewSelection(commits, 2)
+    local refreshed = {
+      { hash = "new-head", parent = "head" },
+      unpack(commits),
+    }
+    eq(true, selection:restore(refreshed, {
+      current = true,
+      includes_working_tree = true,
+      base_oid = "head",
+    }))
+
+    local range = selection:range()
+    eq(false, range.current)
+    eq(0, range.first)
+    eq(1, range.last)
+    eq("head", range.base)
+    eq("new-head", range.newest.hash)
+  end)
+
   it("tracks and cancels a pending range", function()
     local selection = ReviewSelection(commits, 2)
     selection:begin(2)

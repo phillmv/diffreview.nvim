@@ -80,6 +80,50 @@ function ReviewSelection:reconcile(commits)
   return true
 end
 
+---@param commits ReviewCommit[]
+---@param selection table
+---@return boolean restored
+function ReviewSelection:restore(commits, selection)
+  assert(#commits > 0, "Review selection requires at least one commit!")
+
+  if selection.current then
+    if commits[1].hash == selection.base_oid then
+      self:reset(commits, 0)
+      return true
+    end
+
+    for i, commit in ipairs(commits) do
+      if commit.parent == selection.base_oid then
+        self.commits = commits
+        self.head = commits[1].hash
+        self.first = 0
+        self.last = i
+        self.anchor = nil
+        return true
+      end
+    end
+    return false
+  end
+
+  local by_hash = {}
+  for i, commit in ipairs(commits) do
+    by_hash[commit.hash] = i
+  end
+
+  local first = selection.includes_working_tree and 0 or by_hash[selection.newest_oid]
+  local last = by_hash[selection.oldest_oid]
+  if first == nil or last == nil or first > last then
+    return false
+  end
+
+  self.commits = commits
+  self.head = commits[1].hash
+  self.first = first
+  self.last = last
+  self.anchor = nil
+  return true
+end
+
 ---@param index integer
 ---@return integer
 function ReviewSelection:clamp(index)

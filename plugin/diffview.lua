@@ -38,6 +38,26 @@ command("DiffviewReview", function(ctx)
   diffview.review(arg_parser.scan(ctx.args).args)
 end, { nargs = "*" })
 
+command("DiffviewReviewStart", function(ctx)
+  diffview.review_start(arg_parser.scan(ctx.args).args, ctx.bang)
+end, { nargs = "*", bang = true })
+
+command("DiffviewReviewResume", function()
+  diffview.emit("review_resume")
+end, { nargs = 0 })
+
+command("DiffviewReviewComment", function()
+  diffview.emit("review_comment")
+end, { nargs = 0 })
+
+command("DiffviewReviewSubmit", function()
+  diffview.emit("review_submit")
+end, { nargs = 0 })
+
+command("DiffviewReviewLeave", function()
+  diffview.emit("review_leave")
+end, { nargs = 0 })
+
 command("DiffviewClose", function()
   diffview.close()
 end, { nargs = 0, bang = true })

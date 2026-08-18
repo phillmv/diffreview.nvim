@@ -193,6 +193,49 @@ COMMANDS                                        *diffview-commands*
             -C{path}    Run as if Git was started in {path} instead of the
                         current working directory.
 
+                                                *:DiffviewReviewStart*
+:DiffviewReviewStart[!] [count] [-C{path}]
+        Enter review mode for the current DiffviewReview range. When invoked
+        outside a DiffviewReview, first open one using the optional [count] and
+        -C{path} arguments.
+
+        If a draft is bound to the exact current range, resume its newest
+        draft. Otherwise create a new one. Use [!] to force a new draft;
+        earlier drafts are always retained. The lower commit panel is replaced
+        by a Review Session panel listing submission and leave actions
+        followed by saved comments.
+
+                                                *:DiffviewReviewComment*
+:DiffviewReviewComment
+        Create or edit the review comment on the current diff line. Comments
+        can only be added while review mode is active and the line belongs to
+        a diff hunk. A centered Markdown buffer is opened; |:write| persists
+        the comment and refreshes its preview annotation and session-panel
+        entry.
+
+                                                *:DiffviewReviewSubmit*
+:DiffviewReviewSubmit
+        Open a centered Markdown buffer for the optional overall review body.
+        Writing and closing the buffer submits the review. The submitted JSON
+        records, captured unified-diff hunks, and rendered `review.md` are
+        retained under `<git-dir>/diffview-review/submitted/`. The newest
+        submission is also available at `<git-dir>/diffview-review/latest.md`.
+        Resolve the Git directory before reading it so linked worktrees work:
+>
+            git_dir="$(git rev-parse --absolute-git-dir)" &&
+              cat "$git_dir/diffview-review/latest.md"
+<
+
+                                                *:DiffviewReviewLeave*
+:DiffviewReviewLeave
+        Leave review mode without submitting. The draft is retained and the
+        commit panel is restored.
+
+                                                *:DiffviewReviewResume*
+:DiffviewReviewResume
+        Select a retained draft and restore the exact range to which it was
+        bound, then enter review mode.
+
                                                 *:DiffviewFileHistory*
 :[range]DiffviewFileHistory [paths] [options]
 
@@ -1154,6 +1197,38 @@ refresh_files                                   *diffview-actions-refresh_files*
 
         Update stats and entries in the file list.
 
+review_comment                                 *diffview-actions-review_comment*
+        Contexts: `view`
+
+        Create or edit a comment on the current DiffviewReview line.
+
+review_leave                                     *diffview-actions-review_leave*
+        Contexts: `review_session_panel`
+
+        Leave review mode while retaining the current draft.
+
+review_session_activate               *diffview-actions-review_session_activate*
+        Contexts: `review_session_panel`
+
+        Activate the selected action or navigate to the selected comment.
+
+review_start                                     *diffview-actions-review_start*
+        Contexts: `view`
+
+        Enter review mode, resuming the newest exact-range draft when one
+        exists.
+
+review_resume                                   *diffview-actions-review_resume*
+        Contexts: `view`
+
+        Select and restore a retained DiffviewReview draft.
+
+review_submit                                   *diffview-actions-review_submit*
+        Contexts: `review_session_panel`
+
+        Open the optional review-body editor and submit the active draft after
+        that buffer is written and closed.
+
 restore_entry                                   *diffview-actions-restore_entry*
         Contexts: `view`, `panel`
 
@@ -1392,6 +1467,10 @@ gf                      Open the local version of the file in a different
                                                 *diffview-maps-focus_files*
 <leader>e               Bring focus to the file panel.
 
+                                                *diffview-maps-review_comment*
+<leader>rc              Create or edit a review comment on the current line
+                        while a DiffviewReview session is active.
+
                                                 *diffview-maps-copy_hash*
 y                       Copy the commit hash of the entry under the cursor.
 
@@ -1440,6 +1519,20 @@ R                       Update the stats and entries in the file list.
 <C-w><C-f>              Open the file in a new split in a different tabpage.
 
 <leader>b               Toggle the file panel.
+
+<leader>e               Bring focus to the file panel.
+
+                                                *diffview-maps-review-session-panel*
+Review session panel maps ~
+
+These mappings are available in the lower panel while review mode is active.
+
+<CR>                    Activate the selected action or navigate to the
+                        selected comment.
+
+s                       Submit the current review.
+
+q                       Leave review mode while retaining the draft.
 
 <leader>e               Bring focus to the file panel.
 

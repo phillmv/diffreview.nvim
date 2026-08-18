@@ -96,6 +96,32 @@ are read-only.
 preserved by commit identity; ranges through `WORKING TREE` extend through a
 new `HEAD`.
 
+Start a line-comment review for the selected range with
+`:DiffviewReviewStart`. While review mode is active, the lower commit panel is
+replaced by a session panel and the range is locked. Place the cursor on a
+changed line and run `:DiffviewReviewComment` (or `<leader>rc`) to create a
+comment in a floating editor. Write the buffer to save it; commented lines are
+annotated with a preview and listed in the session panel.
+
+`DiffviewReviewStart` also works outside a review view: it opens
+`DiffviewReview` first. It resumes the newest draft bound to the exact current
+range when one exists; use `:DiffviewReviewStart!` to force a new draft.
+
+Choose **Submit review** from the session panel, or run
+`:DiffviewReviewSubmit`, to edit an optional overall review body. Writing and
+closing that buffer stores an immutable Markdown review under the repository's
+Git directory. **Leave review mode** retains the draft without submitting it.
+`:DiffviewReviewResume` restores a retained draft and its revision range.
+
+Each submission is retained under `<git-dir>/diffview-review/submitted/`, and
+the newest is also written to `<git-dir>/diffview-review/latest.md`. Resolve
+the Git directory before reading it so this works with linked worktrees:
+
+```sh
+git_dir="$(git rev-parse --absolute-git-dir)" &&
+  cat "$git_dir/diffview-review/latest.md"
+```
+
 ## Usage
 
 ### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`
@@ -146,6 +172,15 @@ With no count, opens the current changes from `HEAD` to the working tree.
 Passing `[count]` opens a combined diff for that many latest first-parent
 commits through `WORKING TREE`. Select another contiguous range from the
 commit panel with `v`, `j`/`k`, and `<CR>`.
+
+Related commands:
+
+- `:DiffviewReviewStart[!] [count]`: Open review mode and resume an exact-range
+  draft, or create one when none exists. Use `!` to force a new draft.
+- `:DiffviewReviewComment`: Create or edit the comment on the current line.
+- `:DiffviewReviewSubmit`: Submit the active draft with an optional body.
+- `:DiffviewReviewLeave`: Leave review mode while retaining the draft.
+- `:DiffviewReviewResume`: Select a retained draft and restore its range.
 
 ### `:[range]DiffviewFileHistory [paths] [options]`
 
@@ -315,6 +350,7 @@ require("diffview").setup({
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
       { "n", "<leader>e",   actions.focus_files,                    { desc = "Bring focus to the file panel" } },
       { "n", "<leader>b",   actions.toggle_files,                   { desc = "Toggle the file panel." } },
+      { "n", "<leader>rc",  actions.review_comment,                 { desc = "Create or edit a DiffviewReview comment" } },
       { "n", "g<C-x>",      actions.cycle_layout,                   { desc = "Cycle through available layouts." } },
       { "n", "[x",          actions.prev_conflict,                  { desc = "In the merge-tool: jump to the previous conflict" } },
       { "n", "]x",          actions.next_conflict,                  { desc = "In the merge-tool: jump to the next conflict" } },
@@ -438,6 +474,12 @@ require("diffview").setup({
       { "n", "<cr>",       actions.review_apply,       { desc = "Apply the selected commit range" } },
       { "n", "<esc>",      actions.review_cancel,      { desc = "Cancel the pending commit range" } },
       { "n", "<leader>e",  actions.focus_files,        { desc = "Bring focus to the file panel" } },
+    },
+    review_session_panel = {
+      { "n", "<cr>",       actions.review_session_activate, { desc = "Activate the selected review item" } },
+      { "n", "s",          actions.review_submit,           { desc = "Submit the current review" } },
+      { "n", "q",          actions.review_leave,            { desc = "Leave review mode" } },
+      { "n", "<leader>e",  actions.focus_files,             { desc = "Bring focus to the file panel" } },
     },
     option_panel = {
       { "n", "<tab>", actions.select_entry,          { desc = "Change the current option" } },

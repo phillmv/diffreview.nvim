@@ -8,6 +8,7 @@ local lazy = require("diffview.lazy")
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
+local ReviewView = lazy.access("diffview.scene.views.review.review_view", "ReviewView") ---@type ReviewView|LazyModule
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 
@@ -147,6 +148,22 @@ function M.review(args)
   local view = lib.review(args)
   if view then
     view:open()
+  end
+end
+
+---@param args string[]
+---@param force_new? boolean
+function M.review_start(args, force_new)
+  local view = lib.get_current_view()
+  if view and view:instanceof(ReviewView.__get()) then
+    view:start_review(force_new)
+    return
+  end
+
+  view = lib.review(args)
+  if view then
+    view:open()
+    view:start_review(force_new)
   end
 end
 
