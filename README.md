@@ -110,7 +110,23 @@ git_dir="$(git rev-parse --absolute-git-dir)" &&
 Every submission is kept under `<git-dir>/diffview-review/submitted/`, and the
 newest one is also copied to `latest.md`. Nothing is pushed anywhere — the
 output is a plain file, so paste it into a pull request, pipe it somewhere, or
-keep it.
+hand it to a coding agent.
+
+Comments are numbered `C1`, `C2`, … in document order, so you have something to
+say out loud: *"why didn't you address C3?"*. Each is headed with the side it
+belongs to — `Before` for the left of the diff, `After` for the right — and
+carries the diff hunk it was attached to:
+
+```markdown
+- Comparing: `INDEX` (before) -> `WORKING TREE` (after)
+- Comments: 4 (C1-C4)
+
+## `core.py`
+
+### C2 - After, line 1
+
+Shouting.
+```
 
 Reviews are identified by the diff they cover: the repository, both revisions,
 and any path arguments. Leaving review mode (`q` in the session panel) keeps

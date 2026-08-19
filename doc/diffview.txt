@@ -452,6 +452,16 @@ COMMANDS                                        *diffview-commands*
                         Resolve the git directory like this rather than
                         assuming `.git`, so that it works in linked worktrees.
 
+                        In the rendered document, comments are numbered `C1`,
+                        `C2`, ... in document order, so that they can be
+                        referred to in conversation — the `comment_id` stored
+                        in the JSON is a timestamp, which is not. Each comment
+                        is headed with the side it belongs to, `Before` for the
+                        left of the diff and `After` for the right, and carries
+                        the diff hunk it was attached to. The line numbers are
+                        from the time of review; locate the code by the hunk
+                        contents rather than by number.
+
                         Leaving review mode without submitting (`q` in the
                         session panel, or |diffview-actions-review_leave|)
                         keeps the draft, which the next

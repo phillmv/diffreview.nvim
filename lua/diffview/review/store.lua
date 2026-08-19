@@ -116,24 +116,25 @@ local function fence_for(text)
   return string.rep("`", math.max(3, longest + 1))
 end
 
+---@param count integer
+---@return string
+local function comment_summary(count)
+  if count == 0 then return "0" end
+  if count == 1 then return "1 (C1)" end
+  return ("%d (C1-C%d)"):format(count, count)
+end
+
+---Render a submitted review for humans and agents to read.
+---
+---Comments are numbered `C1`, `C2`, ... in document order, so that they can be
+---referred to in conversation; the timestamped `comment_id` in the JSON is not
+---something anyone can say out loud. The numbering is fixed once submitted,
+---because the document is written exactly once.
 ---@param review table
 ---@param comments table[]
 ---@return string
 local function render_markdown(review, comments)
-  local lines = {
-    "# Submitted Diffview Review",
-    "",
-    "- Review: `" .. review.review_id .. "`",
-    "- Range: `" .. scope_lib.render(review.scope) .. "`",
-    "- Submitted: `" .. review.submitted_at .. "`",
-  }
-
-  if review.body and review.body ~= "" then
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = "## Review"
-    lines[#lines + 1] = ""
-    vim.list_extend(lines, split_lines(review.body))
-  end
+  local scope = review.scope
 
   table.sort(comments, function(a, b)
     local al = a.location
@@ -144,9 +145,34 @@ local function render_markdown(review, comments)
     return a.comment_id < b.comment_id
   end)
 
+  local lines = {
+    "# Submitted Diffview Review",
+    "",
+    "- Review: `" .. review.review_id .. "`",
+    ("- Comparing: `%s` (before) -> `%s` (after)"):format(
+      scope_lib.render_rev(scope.left),
+      scope_lib.render_rev(scope.right)
+    ),
+    "- Comments: " .. comment_summary(#comments),
+    "- Submitted: `" .. review.submitted_at .. "`",
+  }
+
+  if scope.path_args and #scope.path_args > 0 then
+    lines[#lines + 1] = "- Paths: `" .. table.concat(scope.path_args, "` `") .. "`"
+  end
+
+  if review.body and review.body ~= "" then
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = "## Review"
+    lines[#lines + 1] = ""
+    vim.list_extend(lines, split_lines(review.body))
+  end
+
   local current_path
-  for _, comment in ipairs(comments) do
+
+  for i, comment in ipairs(comments) do
     local location = comment.location
+
     if current_path ~= location.path then
       current_path = location.path
       lines[#lines + 1] = ""
@@ -154,8 +180,9 @@ local function render_markdown(review, comments)
     end
 
     lines[#lines + 1] = ""
-    lines[#lines + 1] = ("### %s line %d"):format(
-      location.side == "left" and "Left" or "Right",
+    lines[#lines + 1] = ("### C%d - %s, line %d"):format(
+      i,
+      location.side == "left" and "Before" or "After",
       location.line
     )
     lines[#lines + 1] = ""

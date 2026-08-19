@@ -161,6 +161,13 @@ function M.render(scope)
   return out
 end
 
+---Render one side of a scope on its own.
+---@param rev ReviewScopeRev
+---@return string
+function M.render_rev(rev)
+  return render_rev(rev)
+end
+
 ---A short, human-facing description of a scope.
 ---@param scope ReviewScope
 ---@return string

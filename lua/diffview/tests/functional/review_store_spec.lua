@@ -150,10 +150,12 @@ describe("ReviewStore", function()
       store:review_dir("submitted", review.review_id) .. "/review.md"
     ), "\n")
     assert.matches("# Submitted Diffview Review", markdown)
-    assert.matches("Range: `aaaaaaaaa%.%.WORKING TREE`", markdown)
+    assert.matches("Comparing: `aaaaaaaaa` %(before%) %-> `WORKING TREE` %(after%)", markdown)
+    assert.matches("Comments: 2 %(C1%-C2%)", markdown)
     assert.matches("Overall review body", markdown)
-    assert.matches("### Left line 4", markdown)
-    assert.matches("### Right line 12", markdown)
+    -- Numbered in document order: path, then side, then line.
+    assert.matches("### C1 %- Before, line 4", markdown)
+    assert.matches("### C2 %- After, line 12", markdown)
     assert.matches("```diff", markdown)
     assert.matches("Use the asynchronous API", markdown)
     eq(markdown, table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n"))
@@ -174,6 +176,54 @@ describe("ReviewStore", function()
     local comments = assert(store:load_comments(review))
     eq(1, #comments)
     eq("Second take.", comments[1].body)
+  end)
+
+  -- The IDs exist so a review can be discussed: "why didn't you do C3?".
+  it("numbers comments sequentially in document order", function()
+    local review = assert(store:create(scope()))
+
+    local function comment(path, side, line, body)
+      return {
+        body = body,
+        location = { path = path, side = side, line = line },
+        diff_hunk = { format = "unified", context_lines = 3, text = "@@ -1 +1 @@" },
+      }
+    end
+
+    -- Saved out of order; the document decides the numbering.
+    assert(store:save_comment(review, comment("z.lua", "right", 5, "last file")))
+    assert(store:save_comment(review, comment("a.lua", "right", 30, "later line")))
+    assert(store:save_comment(review, comment("a.lua", "right", 2, "earlier line")))
+    assert(store:save_comment(review, comment("a.lua", "left", 9, "old side")))
+
+    assert(store:submit(review, ""))
+    local markdown = table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n")
+
+    local ids = {}
+    for id, side, line in markdown:gmatch("### (C%d+) %- (%a+), line (%d+)") do
+      ids[#ids + 1] = ("%s:%s:%s"):format(id, side, line)
+    end
+
+    eq({
+      "C1:Before:9",
+      "C2:After:2",
+      "C3:After:30",
+      "C4:After:5",
+    }, ids)
+    assert.matches("Comments: 4 %(C1%-C4%)", markdown)
+  end)
+
+  it("summarises a single comment without a range", function()
+    local review = assert(store:create(scope()))
+    assert(store:save_comment(review, {
+      body = "Only one.",
+      location = { path = "a.lua", side = "right", line = 1 },
+      diff_hunk = { format = "unified", context_lines = 3, text = "@@ -1 +1 @@" },
+    }))
+    assert(store:submit(review, ""))
+
+    local markdown = table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n")
+    assert.matches("Comments: 1 %(C1%)", markdown)
   end)
 
   it("updates the latest review without removing earlier submissions", function()
