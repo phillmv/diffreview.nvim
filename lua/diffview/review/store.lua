@@ -10,6 +10,12 @@ local islist = vim.islist or vim.tbl_islist
 
 local M = {}
 
+---Bumped when the on-disk layout changes incompatibly. Manifests written by
+---any other version are ignored rather than guessed at.
+local SCHEMA_VERSION = 1
+
+M.SCHEMA_VERSION = SCHEMA_VERSION
+
 local function timestamp()
   local seconds, microseconds = uv.gettimeofday()
   return os.date("!%Y%m%dT%H%M%S", seconds)
@@ -217,7 +223,7 @@ function ReviewStore:create(scope)
 
   local now = iso_timestamp()
   local review = {
-    schema_version = 1,
+    schema_version = SCHEMA_VERSION,
     review_id = review_id,
     state = "draft",
     created_at = now,
@@ -306,6 +312,16 @@ function ReviewStore:save_comment(review, comment)
   return self:save_review(review)
 end
 
+---Whether a decoded manifest is one this version knows how to work with.
+---@param review any
+---@return boolean
+local function is_usable(review)
+  return type(review) == "table"
+    and review.schema_version == SCHEMA_VERSION
+    and type(review.review_id) == "string"
+    and scope_lib.is_valid(review.scope)
+end
+
 ---@return table[] drafts
 function ReviewStore:list_drafts()
   local drafts = {}
@@ -313,7 +329,7 @@ function ReviewStore:list_drafts()
   for _, path in ipairs(paths) do
     if pl:is_dir(path) then
       local review = read_json(pl:join(path, "review.json"))
-      if review and review.state == "draft" then
+      if is_usable(review) and review.state == "draft" then
         local comments = self:load_comments(review)
         review.comment_count = comments and #comments or 0
         drafts[#drafts + 1] = review

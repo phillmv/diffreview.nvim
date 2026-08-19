@@ -97,11 +97,30 @@ local function same_rev(a, b)
   return a.oid == b.oid
 end
 
+---@param side any
+---@return boolean
+local function valid_rev(side)
+  return type(side) == "table" and type(side.kind) == "string"
+end
+
+---Whether a decoded scope has the shape this module knows how to compare.
+---Manifests are read off disk, so they can be hand-edited, truncated, or
+---written by a different schema version.
+---@param scope any
+---@return boolean
+function M.is_valid(scope)
+  return type(scope) == "table"
+    and type(scope.toplevel) == "string"
+    and (scope.path_args == nil or type(scope.path_args) == "table")
+    and valid_rev(scope.left)
+    and valid_rev(scope.right)
+end
+
 ---@param a? ReviewScope
 ---@param b? ReviewScope
 ---@return boolean
 function M.same(a, b)
-  if not a or not b then return false end
+  if not (M.is_valid(a) and M.is_valid(b)) then return false end
   if a.toplevel ~= b.toplevel then return false end
   if not same_rev(a.left, b.left) then return false end
   if not same_rev(a.right, b.right) then return false end

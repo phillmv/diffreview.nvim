@@ -97,6 +97,33 @@ describe("Review scope", function()
       eq(false, scope.same(nil, make(commit(A), { kind = "local" })))
       eq(false, scope.same(make(commit(A), { kind = "local" }), nil))
     end)
+
+    -- Scopes are read back off disk, so they can be truncated or hand-edited.
+    -- A malformed one must compare unequal rather than throw.
+    it("rejects malformed scopes instead of erroring", function()
+      local good = make(commit(A), { kind = "local" })
+
+      local broken = {
+        { toplevel = "/repo", right = { kind = "local" } },            -- no left
+        { toplevel = "/repo", left = commit(A) },                      -- no right
+        { left = commit(A), right = { kind = "local" } },              -- no toplevel
+        { toplevel = "/repo", left = "nonsense", right = { kind = "local" } },
+        { toplevel = "/repo", left = {}, right = { kind = "local" } }, -- no kind
+        {},
+        "not a table",
+        42,
+      }
+
+      for i, scrap in ipairs(broken) do
+        local ok, res = pcall(scope.same, good, scrap)
+        assert.is_true(ok, ("scope.same threw on case %d: %s"):format(i, res))
+        eq(false, res)
+
+        ok, res = pcall(scope.same, scrap, good)
+        assert.is_true(ok, ("scope.same threw on reversed case %d: %s"):format(i, res))
+        eq(false, res)
+      end
+    end)
   end)
 
   describe("encode()", function()

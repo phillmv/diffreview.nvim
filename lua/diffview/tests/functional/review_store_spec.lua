@@ -68,6 +68,38 @@ describe("ReviewStore", function()
 
       eq(nil, store:find_draft(scope()))
     end)
+
+    -- One hand-edited or half-written manifest must not take the whole
+    -- feature down with it.
+    it("skips unusable manifests without erroring", function()
+      local good = assert(store:create(scope()))
+
+      local function write_draft(id, manifest)
+        local dir = store:review_dir("draft", id)
+        vim.fn.mkdir(dir, "p")
+        vim.fn.writefile(vim.split(manifest, "\n", { plain = true }), dir .. "/review.json")
+      end
+
+      write_draft("bad-no-scope", '{"schema_version":1,"review_id":"bad-no-scope","state":"draft"}')
+      write_draft("bad-no-left",
+        '{"schema_version":1,"review_id":"bad-no-left","state":"draft",'
+        .. '"scope":{"toplevel":"/repo","right":{"kind":"local"}}}')
+      write_draft("bad-future",
+        '{"schema_version":99,"review_id":"bad-future","state":"draft",'
+        .. '"scope":{"toplevel":"/repo","left":{"kind":"commit","oid":"' .. A
+        .. '"},"right":{"kind":"local"}}}')
+      write_draft("bad-truncated", '{"schema_version":1,"review_id":')
+
+      local ok, drafts = pcall(store.list_drafts, store)
+      assert.is_true(ok, "list_drafts threw: " .. tostring(drafts))
+      eq(1, #drafts)
+      eq(good.review_id, drafts[1].review_id)
+
+      local found
+      ok, found = pcall(store.find_draft, store, scope())
+      assert.is_true(ok, "find_draft threw: " .. tostring(found))
+      eq(good.review_id, found.review_id)
+    end)
   end)
 
   it("persists comments independently and renders a submission", function()
