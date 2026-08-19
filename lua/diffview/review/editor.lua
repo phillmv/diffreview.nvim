@@ -10,7 +10,6 @@ local next_id = 0
 ---@field lines? string[]
 ---@field filetype? string
 ---@field on_write fun(lines: string[]): boolean?
----@field on_submit? fun(lines: string[])
 ---@field on_close? fun() # Runs once the window has gone and the layout settled.
 
 ---Open a scratch buffer in a split below the diff, in the style of
@@ -18,9 +17,6 @@ local next_id = 0
 ---
 ---`on_write` decides what a given body means, including an empty one, and
 ---returns false to refuse the write and keep the buffer open.
----
----When `on_submit` is given it runs once the window closes, provided the
----buffer was last written successfully and has no unsaved edits.
 ---@param opt ReviewEditorOptions
 ---@return integer bufnr
 ---@return integer winid
@@ -57,35 +53,23 @@ function M.open(opt)
     vim.wo[winid].statusline = banner:gsub("%%", "%%%%")
   end
 
-  local last_write
   api.nvim_create_autocmd("BufWriteCmd", {
     buffer = bufnr,
     callback = function()
       local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
       local ok = opt.on_write(lines)
       if ok == false then return end
-      last_write = lines
       vim.bo[bufnr].modified = false
     end,
   })
 
-  if opt.on_submit or opt.on_close then
+  if opt.on_close then
     api.nvim_create_autocmd("WinClosed", {
       pattern = tostring(winid),
       once = true,
-      callback = function()
-        -- Only submit what was actually written: anything typed since the last
-        -- successful write leaves the buffer modified, and is discarded.
-        local dirty = api.nvim_buf_is_valid(bufnr) and vim.bo[bufnr].modified
-
-        if opt.on_submit and last_write and not dirty then
-          opt.on_submit(last_write)
-        end
-
-        -- The window is still present during `WinClosed`; wait for the rows it
-        -- occupied to be handed back before anyone measures the layout.
-        if opt.on_close then vim.schedule(opt.on_close) end
-      end,
+      -- The window is still present during `WinClosed`; wait for the rows it
+      -- occupied to be handed back before anyone measures the layout.
+      callback = function() vim.schedule(opt.on_close) end,
     })
   end
 

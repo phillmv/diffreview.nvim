@@ -69,6 +69,12 @@ local function long_lines(variant)
   return lines
 end
 
+---Answer the next `getchar()` prompt.
+---@param key string
+local function answer(key)
+  api.nvim_feedkeys(key, "t", false)
+end
+
 describe("Review sessions on a diff view", function()
   local dir
 
@@ -259,26 +265,73 @@ describe("Review sessions on a diff view", function()
     assert.equals(2, #view.review_session.store:list_drafts())
   end)
 
-  it("submits the review and leaves review mode", function()
-    local view = open()
+  describe("submitting", function()
+    it("submits and leaves review mode when confirmed", function()
+      local view = open()
 
-    diffview.review_comment()
-    write_editor("Please keep the previous value.")
+      diffview.review_comment()
+      write_editor("Please keep the previous value.")
 
-    diffview.review_submit()
-    write_editor("Overall review.")
+      answer("y")
+      diffview.review_submit()
 
-    assert.is_nil(view.review_session)
-    assert.is_nil(view.panel.session_panel)
+      assert.is_nil(view.review_session)
+      assert.is_nil(view.panel.session_panel)
 
-    local git_dir = git(dir, "rev-parse", "--absolute-git-dir")
-    local markdown = table.concat(
-      vim.fn.readfile(git_dir .. "/diffview-review/latest.md"),
-      "\n"
-    )
-    assert.matches("Overall review", markdown)
-    assert.matches("Please keep the previous value", markdown)
-    assert.matches("@@ %-1,2 %+1,2 @@", markdown)
+      local git_dir = git(dir, "rev-parse", "--absolute-git-dir")
+      local markdown = table.concat(
+        vim.fn.readfile(git_dir .. "/diffview-review/latest.md"),
+        "\n"
+      )
+      assert.matches("Please keep the previous value", markdown)
+      assert.matches("@@ %-1,2 %+1,2 @@", markdown)
+    end)
+
+    it("does nothing when declined", function()
+      local view = open()
+
+      diffview.review_comment()
+      write_editor("Keep this.")
+
+      local session = assert(view.review_session)
+      local review_id = session.review.review_id
+
+      answer("n")
+      diffview.review_submit()
+
+      assert.equals(session, view.review_session)
+      assert.equals("draft", assert(session.store:load("draft", review_id)).state)
+      assert.is_nil(session.store:load("submitted", review_id))
+    end)
+
+    -- Anything other than an explicit "y" is a decline, so a stray keypress
+    -- can't submit a review.
+    it("treats an unrelated key as a decline", function()
+      local view = open()
+
+      diffview.review_comment()
+      write_editor("Keep this.")
+
+      local session = assert(view.review_session)
+
+      answer("<")
+      diffview.review_submit()
+
+      assert.equals(session, view.review_session)
+      assert.is_nil(session.store:load("submitted", session.review.review_id))
+    end)
+
+    it("accepts an uppercase Y", function()
+      local view = open()
+
+      diffview.review_comment()
+      write_editor("Keep this.")
+
+      answer("Y")
+      diffview.review_submit()
+
+      assert.is_nil(view.review_session)
+    end)
   end)
 
   -- Opening the split shrinks the diff windows, and the one holding the cursor
@@ -459,7 +512,7 @@ describe("Review sessions on a diff view", function()
       )
     end)
 
-    it("refuses to submit when the review is left after the write", function()
+    it("refuses to submit a review that was left first", function()
       local view = open()
 
       diffview.review_comment()
@@ -468,17 +521,11 @@ describe("Review sessions on a diff view", function()
       local session = assert(view.review_session)
       local review_id = session.review.review_id
 
-      diffview.review_submit()
-      local editor_win = api.nvim_get_current_win()
-      api.nvim_buf_set_lines(0, 0, -1, false, { "Overall body." })
-      api.nvim_buf_call(api.nvim_win_get_buf(editor_win), function()
-        vim.cmd("write")
-      end)
-
-      -- Written while active, but the review is left before the window closes,
-      -- which is what fires `on_submit`.
       review.leave(view)
-      pcall(api.nvim_win_close, editor_win, false)
+
+      -- The panel action still holds a reference to the detached session.
+      answer("y")
+      session:confirm_submit()
 
       assert.equals(1, #session.store:list_drafts())
       assert.equals("draft", assert(session.store:load("draft", review_id)).state)

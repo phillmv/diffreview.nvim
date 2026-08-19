@@ -370,30 +370,30 @@ ReviewSession.goto_comment = async.void(function(self, comment)
   pcall(api.nvim_win_set_cursor, target.id, { line, 0 })
 end)
 
-function ReviewSession:open_submit_editor()
-  local restore = capture_layout(self.view)
+---Confirm, then submit. The review body is not prompted for; `store:submit`
+---still accepts one, so the editor can come back later.
+function ReviewSession:confirm_submit()
+  local count = #self.comments
+  local answer = utils.input_char(
+    ("Submit review %s with %d comment%s? [y/N] "):format(
+      self.review.review_id,
+      count,
+      count == 1 and "" or "s"
+    ),
+    { prompt_hl = "Question" }
+  )
 
-  Editor.open({
-    title = ("Submit review (%d comments)"):format(#self.comments),
-    hint = ":wq to submit  ·  :q! to cancel",
-    lines = { "" },
-    -- The overall body is optional; a review can be just its line comments.
-    on_write = function()
-      if not self:is_active() then
-        utils.err("This review is no longer active; it was not submitted.")
-        return false
-      end
+  if not answer or answer:lower() ~= "y" then
+    utils.info("Submission cancelled.")
+    return
+  end
 
-      return true
-    end,
-    on_submit = function(lines)
-      if not self:is_active() then return end
-      self:submit(table.concat(lines, "\n"))
-    end,
-    on_close = restore,
-  })
+  if not self:is_active() then
+    utils.err("This review is no longer active; it was not submitted.")
+    return
+  end
 
-  restore()
+  self:submit("")
 end
 
 ---@param body string
@@ -417,7 +417,7 @@ function ReviewSession:activate_panel_item()
   if item.kind == "comment" then
     self:goto_comment(item.comment)
   elseif item.action == "submit" then
-    self:open_submit_editor()
+    self:confirm_submit()
   elseif item.action == "leave" then
     M.leave(self.view)
   end
@@ -523,7 +523,7 @@ function M.submit(view)
     return
   end
 
-  view.review_session:open_submit_editor()
+  view.review_session:confirm_submit()
 end
 
 ---@param view DiffView

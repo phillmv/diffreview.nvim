@@ -436,10 +436,8 @@ COMMANDS                                        *diffview-commands*
                         re-add the comment if you still want it.
 
                                                 *:DiffviewReviewSubmit*
-:DiffviewReviewSubmit   Submit the active review. Opens a split for an optional
-                        overall review body: |:wq| submits, |:q!| cancels.
-                        Unlike a comment, an empty body is accepted — a review
-                        can be just its line comments.
+:DiffviewReviewSubmit   Submit the active review, after a `[y/N]` confirmation.
+                        Anything other than `y` cancels.
 
                         Submitting renders the review to Markdown and leaves
                         review mode. The draft is moved to

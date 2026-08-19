@@ -98,9 +98,9 @@ listed in a session panel below the file panel.
 Running it again on a commented line reopens that comment for editing. Saving
 it empty deletes it.
 
-When you're done, `:DiffviewReviewSubmit` opens a split for an optional overall
-review body. `:wq` submits; the review is rendered to Markdown and stored under
-the repository's git directory:
+When you're done, `:DiffviewReviewSubmit` asks for confirmation and then
+renders the review to Markdown, storing it under the repository's git
+directory:
 
 ```sh
 git_dir="$(git rev-parse --absolute-git-dir)" &&
