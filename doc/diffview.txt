@@ -422,6 +422,13 @@ COMMANDS                                        *diffview-commands*
                         Comments record the file, side, line, and the unified
                         diff hunk they were made against.
 
+                        NOTE: The editor is an ordinary floating window and can
+                        outlive the review. If you leave review mode or submit
+                        while one is still open, writing it is refused rather
+                        than saved into the review you walked away from. The
+                        text stays in the buffer, so start a review again and
+                        re-add the comment if you still want it.
+
                                                 *:DiffviewReviewSubmit*
 :DiffviewReviewSubmit   Submit the active review. Opens a floating buffer for
                         an optional overall review body: write it, then close

@@ -85,6 +85,18 @@ function ReviewSession:describe()
   return scope_lib.describe(self.review.scope)
 end
 
+---Whether this session is still the one attached to its view.
+---
+---Editor floats outlive the session that opened them: leaving review mode or
+---submitting detaches the session while the float is still on screen. Anything
+---driven by an editor callback has to check this first, or it will write to an
+---abandoned review and strand extmarks in a buffer that nothing will ever
+---clean up again.
+---@return boolean
+function ReviewSession:is_active()
+  return self.view.review_session == self
+end
+
 ---@return boolean ok
 function ReviewSession:reload_comments()
   local comments, err = self.store:load_comments(self.review)
@@ -191,6 +203,11 @@ function ReviewSession:open_comment_editor(comment)
     ),
     lines = vim.split(comment.body or "", "\n", { plain = true }),
     on_write = function(lines)
+      if not self:is_active() then
+        utils.err("This review is no longer active; the comment was not saved.")
+        return false
+      end
+
       local body = table.concat(lines, "\n")
 
       if vim.trim(body) == "" then
@@ -310,9 +327,15 @@ function ReviewSession:open_submit_editor()
     title = ("Submit review (%d comments)"):format(#self.comments),
     lines = { "" },
     on_write = function()
+      if not self:is_active() then
+        utils.err("This review is no longer active; it was not submitted.")
+        return false
+      end
+
       return true
     end,
     on_submit = function(lines)
+      if not self:is_active() then return end
       self:submit(table.concat(lines, "\n"))
     end,
   })

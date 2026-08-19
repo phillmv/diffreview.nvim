@@ -258,6 +258,68 @@ describe("Review sessions on a diff view", function()
     assert.matches("@@ %-1,2 %+1,2 @@", markdown)
   end)
 
+  -- Editor floats outlive the session that opened them.
+  describe("an editor left open past its session", function()
+    it("refuses to save a comment, and strands nothing", function()
+      local view, win = open()
+
+      diffview.review_comment()
+      local editor_win = api.nvim_get_current_win()
+      local session = assert(view.review_session)
+
+      review.leave(view)
+      assert.is_nil(view.review_session)
+
+      api.nvim_set_current_win(editor_win)
+      api.nvim_buf_set_lines(0, 0, -1, false, { "Written after leaving." })
+      api.nvim_buf_call(api.nvim_win_get_buf(editor_win), function()
+        pcall(vim.cmd, "write")
+      end)
+
+      assert.equals(
+        0,
+        #api.nvim_buf_get_extmarks(win.file.bufnr, review.annotation_ns, 0, -1, {})
+      )
+      assert.equals(0, #assert(session.store:load_comments(session.review)))
+
+      -- The working-tree buffer outlives the view, so a stray extmark here
+      -- would sit in the user's file for the rest of the session.
+      pcall(api.nvim_win_close, editor_win, true)
+      diffview.close()
+      assert.is_true(api.nvim_buf_is_valid(win.file.bufnr))
+      assert.equals(
+        0,
+        #api.nvim_buf_get_extmarks(win.file.bufnr, review.annotation_ns, 0, -1, {})
+      )
+    end)
+
+    it("refuses to submit when the review is left after the write", function()
+      local view = open()
+
+      diffview.review_comment()
+      write_editor("Keep this.")
+
+      local session = assert(view.review_session)
+      local review_id = session.review.review_id
+
+      diffview.review_submit()
+      local editor_win = api.nvim_get_current_win()
+      api.nvim_buf_set_lines(0, 0, -1, false, { "Overall body." })
+      api.nvim_buf_call(api.nvim_win_get_buf(editor_win), function()
+        vim.cmd("write")
+      end)
+
+      -- Written while active, but the review is left before the window closes,
+      -- which is what fires `on_submit`.
+      review.leave(view)
+      pcall(api.nvim_win_close, editor_win, false)
+
+      assert.equals(1, #session.store:list_drafts())
+      assert.equals("draft", assert(session.store:load("draft", review_id)).state)
+      assert.is_nil(session.store:load("submitted", review_id))
+    end)
+  end)
+
   describe("DiffviewReviewStart arguments", function()
     it("opens a diff view when none is running", function()
       assert.is_nil(lib.get_current_view())
