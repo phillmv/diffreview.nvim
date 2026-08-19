@@ -48,6 +48,27 @@ local function write_editor(text)
   api.nvim_win_close(winid, false)
 end
 
+---A file long enough that the diff windows actually scroll.
+---
+---The changes have to be dense: diff mode folds unchanged regions, so a long
+---file with one edit collapses to a handful of screen lines and cannot scroll
+---at all.
+---@param variant string
+---@return string[]
+local function long_lines(variant)
+  local lines = {}
+
+  for i = 1, 200 do
+    if i % 4 == 1 then
+      lines[i] = ("%s line %03d"):format(variant, i)
+    else
+      lines[i] = ("plain line %03d"):format(i)
+    end
+  end
+
+  return lines
+end
+
 describe("Review sessions on a diff view", function()
   local dir
 
@@ -62,10 +83,12 @@ describe("Review sessions on a diff view", function()
     commit(dir, "example.txt", { "two", "unchanged" }, "second")
     commit(dir, "example.txt", { "three", "unchanged" }, "third")
     commit(dir, "second.txt", { "alpha", "unchanged" }, "add second")
+    commit(dir, "long.txt", long_lines("before"), "add long")
 
     -- Uncommitted changes, so the default `:DiffviewOpen` has entries.
     vim.fn.writefile({ "four", "unchanged" }, dir .. "/example.txt")
     vim.fn.writefile({ "beta", "unchanged" }, dir .. "/second.txt")
+    vim.fn.writefile(long_lines("after"), dir .. "/long.txt")
   end)
 
   after_each(function()
@@ -256,6 +279,45 @@ describe("Review sessions on a diff view", function()
     assert.matches("Overall review", markdown)
     assert.matches("Please keep the previous value", markdown)
     assert.matches("@@ %-1,2 %+1,2 @@", markdown)
+  end)
+
+  -- Opening the split shrinks the diff windows, and the one holding the cursor
+  -- scrolls to keep it visible. `scrollbind` doesn't sync on a resize, so
+  -- without care the two sides drift apart.
+  describe("diff alignment", function()
+    local function topline(win)
+      return api.nvim_win_call(win, function() return vim.fn.winsaveview().topline end)
+    end
+
+    for _, case in ipairs({ { "left", "a" }, { "right", "b" } }) do
+      local label, sym = case[1], case[2]
+
+      it(("survives commenting from the %s side"):format(label), function()
+        local view = open()
+        view:set_file_by_path("long.txt", false, true)
+        await_entry(view, "long.txt")
+
+        local win = assert(view.cur_layout[sym])
+        api.nvim_set_current_win(win.id)
+        api.nvim_win_set_cursor(win.id, { 120, 0 })
+        vim.cmd("normal! zz")
+
+        local before = topline(view.cur_layout.a.id)
+        assert.is_true(before > 1, "the diff did not scroll; the fixture is too short")
+        assert.equals(before, topline(view.cur_layout.b.id))
+
+        diffview.review_comment()
+        assert.equals(before, topline(view.cur_layout.a.id))
+        assert.equals(before, topline(view.cur_layout.b.id))
+
+        api.nvim_buf_set_lines(0, 0, -1, false, { "A note." })
+        vim.cmd("wq")
+        vim.wait(300, function() return false end)
+
+        assert.equals(before, topline(view.cur_layout.a.id))
+        assert.equals(before, topline(view.cur_layout.b.id))
+      end)
+    end
   end)
 
   -- Editor floats outlive the session that opened them.

@@ -55,7 +55,7 @@ function ReviewSessionPanel:init(parent)
         position = "bottom",
         relative = "win",
         win = self.parent.winid,
-        height = conf.height,
+        height = self:preferred_height(conf.height),
         win_opts = conf.win_opts,
       }
     end,
@@ -67,6 +67,18 @@ function ReviewSessionPanel:init(parent)
       self:setup_buffer()
     end,
   })
+end
+
+---Take only the rows the content needs, so that the panel doesn't hold on to
+---space the diff and the comment editor could be using.
+---@param max integer
+---@return integer
+function ReviewSessionPanel:preferred_height(max)
+  -- Header, the two actions, and the comment header.
+  local fixed = 4
+  local comments = self.session and #self.session.comments or 0
+
+  return math.max(fixed, math.min(max, fixed + comments))
 end
 
 function ReviewSessionPanel:setup_buffer()
@@ -81,6 +93,7 @@ end
 function ReviewSessionPanel:set_session(session)
   self.session = session
   self:sync()
+  self:resize()
 end
 
 function ReviewSessionPanel:update_components()

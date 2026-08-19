@@ -38,6 +38,35 @@ local function sort_comments(comments)
   return comments
 end
 
+---Opening or closing a split disturbs the rest of the layout: the panels lose
+---rows despite `winfixheight`, and the diff window holding the cursor scrolls
+---to keep it visible. `scrollbind` only syncs on scroll *commands*, not on a
+---resize, so that last one silently breaks alignment between the two sides.
+---
+---Capture the layout before the split, and put it back afterwards.
+---@param view DiffView
+---@return fun() restore
+local function capture_layout(view)
+  local views = {}
+
+  for _, win in ipairs(view.cur_layout and view.cur_layout.windows or {}) do
+    if win.id and api.nvim_win_is_valid(win.id) then
+      views[win.id] = api.nvim_win_call(win.id, vim.fn.winsaveview)
+    end
+  end
+
+  return function()
+    -- May run scheduled, so the view could have gone away in the meantime.
+    if view.panel and view.panel:is_open() then view.panel:resize() end
+
+    for winid, saved in pairs(views) do
+      if api.nvim_win_is_valid(winid) then
+        api.nvim_win_call(winid, function() vim.fn.winrestview(saved) end)
+      end
+    end
+  end
+end
+
 ---Describe what a view currently has on screen, in the form used both to
 ---decide whether a draft belongs to it and whether a set of `:DiffviewOpen`
 ---arguments would land on the same diff.
@@ -194,6 +223,7 @@ end
 ---@param comment table
 function ReviewSession:open_comment_editor(comment)
   local location = comment.location
+  local restore = capture_layout(self.view)
 
   Editor.open({
     title = ("%s:%d [%s]"):format(
@@ -208,14 +238,8 @@ function ReviewSession:open_comment_editor(comment)
         return false
       end
 
-      local body = table.concat(lines, "\n")
-
-      if vim.trim(body) == "" then
-        utils.err("Review comments cannot be empty.")
-        return false
-      end
-
-      comment.body = body
+      -- The editor cancels on an empty buffer, so this only runs with content.
+      comment.body = table.concat(lines, "\n")
       local ok, err = self.store:save_comment(self.review, comment)
 
       if not ok then
@@ -225,7 +249,10 @@ function ReviewSession:open_comment_editor(comment)
 
       return self:reload_comments()
     end,
+    on_close = restore,
   })
+
+  restore()
 end
 
 ---Comment on the line under the cursor, or edit the comment already there.
@@ -323,9 +350,13 @@ ReviewSession.goto_comment = async.void(function(self, comment)
 end)
 
 function ReviewSession:open_submit_editor()
+  local restore = capture_layout(self.view)
+
   Editor.open({
     title = ("Submit review (%d comments)"):format(#self.comments),
     lines = { "" },
+    -- The overall body is optional; a review can be just its line comments.
+    allow_empty = true,
     on_write = function()
       if not self:is_active() then
         utils.err("This review is no longer active; it was not submitted.")
@@ -338,7 +369,10 @@ function ReviewSession:open_submit_editor()
       if not self:is_active() then return end
       self:submit(table.concat(lines, "\n"))
     end,
+    on_close = restore,
   })
+
+  restore()
 end
 
 ---@param body string

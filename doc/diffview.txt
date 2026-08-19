@@ -413,27 +413,30 @@ COMMANDS                                        *diffview-commands*
                         started first, exactly as |:DiffviewReviewStart| with
                         no arguments would.
 
-                        The comment is written in a floating buffer. Write the
-                        buffer (|:write|) to save it; empty comments are
-                        rejected. Saved comments are shown as virtual text at
-                        the end of the commented line, and listed in the review
-                        session panel below the file panel.
+                        The comment is written in a split below the diff, in
+                        the style of `COMMIT_EDITMSG`: |:wq| saves and closes,
+                        and |:q!| discards. Quitting with an empty buffer
+                        cancels the comment.
+
+                        Saved comments are shown as virtual text at the end of
+                        the commented line, and listed in the review session
+                        panel below the file panel.
 
                         Comments record the file, side, line, and the unified
                         diff hunk they were made against.
 
-                        NOTE: The editor is an ordinary floating window and can
-                        outlive the review. If you leave review mode or submit
-                        while one is still open, writing it is refused rather
-                        than saved into the review you walked away from. The
-                        text stays in the buffer, so start a review again and
+                        NOTE: The editor is an ordinary window and can outlive
+                        the review. If you leave review mode or submit while
+                        one is still open, writing it is refused rather than
+                        saved into the review you walked away from. The text
+                        stays in the buffer, so start a review again and
                         re-add the comment if you still want it.
 
                                                 *:DiffviewReviewSubmit*
-:DiffviewReviewSubmit   Submit the active review. Opens a floating buffer for
-                        an optional overall review body: write it, then close
-                        the window to submit. Closing without writing, or with
-                        unsaved changes, cancels.
+:DiffviewReviewSubmit   Submit the active review. Opens a split for an optional
+                        overall review body: |:wq| submits, |:q!| cancels.
+                        Unlike a comment, an empty body is accepted — a review
+                        can be just its line comments.
 
                         Submitting renders the review to Markdown and leaves
                         review mode. The draft is moved to

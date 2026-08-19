@@ -90,6 +90,12 @@ function FilePanel:destroy()
   FilePanel.super_class.destroy(self)
 end
 
+---@override
+function FilePanel:resize()
+  FilePanel.super_class.resize(self)
+  if self.session_panel then self.session_panel:resize() end
+end
+
 ---@param session ReviewSession
 function FilePanel:enter_review_session(session)
   self.session_panel = self.session_panel or ReviewSessionPanel(self)
