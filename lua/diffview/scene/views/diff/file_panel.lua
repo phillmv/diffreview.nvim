@@ -3,6 +3,7 @@ local oop = require("diffview.oop")
 local renderer = require("diffview.renderer")
 local utils = require("diffview.utils")
 local Panel = require("diffview.ui.panel").Panel
+local ReviewSessionPanel = require("diffview.review.session_panel").ReviewSessionPanel
 local api = vim.api
 local M = {}
 
@@ -22,6 +23,7 @@ local M = {}
 ---@field components CompStruct
 ---@field constrain_cursor function
 ---@field help_mapping string
+---@field session_panel? ReviewSessionPanel
 local FilePanel = oop.create_class("FilePanel", Panel)
 
 FilePanel.winopts = vim.tbl_extend("force", Panel.winopts, {
@@ -69,7 +71,44 @@ end
 ---@override
 function FilePanel:open()
   FilePanel.super_class.open(self)
+  if self.session_panel then self.session_panel:open() end
   vim.cmd("wincmd =")
+end
+
+---@override
+function FilePanel:close()
+  if self.session_panel then self.session_panel:close() end
+  FilePanel.super_class.close(self)
+end
+
+---@override
+function FilePanel:destroy()
+  if self.session_panel then
+    self.session_panel:destroy()
+    self.session_panel = nil
+  end
+  FilePanel.super_class.destroy(self)
+end
+
+---@param session ReviewSession
+function FilePanel:enter_review_session(session)
+  self.session_panel = self.session_panel or ReviewSessionPanel(self)
+  self.session_panel:set_session(session)
+
+  -- `FilePanel:open()` brings the session panel up along with the file panel,
+  -- in that order, so that the split is positioned relative to it.
+  self:open()
+end
+
+function FilePanel:leave_review_session()
+  if not self.session_panel then return end
+  self.session_panel:destroy()
+  self.session_panel = nil
+end
+
+---Re-render the session panel after the session's comments have changed.
+function FilePanel:sync_review_session()
+  if self.session_panel then self.session_panel:sync() end
 end
 
 function FilePanel:setup_buffer()

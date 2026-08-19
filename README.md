@@ -78,6 +78,52 @@ Get started by opening file history for:
 
 For more info, see `:h :DiffviewFileHistory`.
 
+## Reviews
+
+Reviews let you attach line comments to any diff and collect them into a
+Markdown document, without leaving nvim and without talking to a forge.
+
+Open a diff you want to review — anything `:DiffviewOpen` accepts works:
+
+```vim
+:DiffviewOpen origin/main...HEAD
+```
+
+Put the cursor on a changed line and run `:DiffviewReviewComment` (or
+`<leader>rc`). If no review is in progress, one starts automatically. Write
+the floating buffer to save the comment. Commented lines are annotated with a
+preview, and every comment is listed in a session panel below the file panel.
+
+When you're done, `:DiffviewReviewSubmit` opens a buffer for an optional
+overall review body. Write it and close the window; the review is rendered to
+Markdown and stored under the repository's git directory:
+
+```sh
+git_dir="$(git rev-parse --absolute-git-dir)" &&
+  cat "$git_dir/diffview-review/latest.md"
+```
+
+Every submission is kept under `<git-dir>/diffview-review/submitted/`, and the
+newest one is also copied to `latest.md`. Nothing is pushed anywhere — the
+output is a plain file, so paste it into a pull request, pipe it somewhere, or
+keep it.
+
+Reviews are identified by the diff they cover: the repository, both revisions,
+and any path arguments. Leaving review mode (`q` in the session panel) keeps
+the draft, and the next review of the same diff picks it right back up. Two
+revisions compare loosely on purpose, so a draft survives ordinary work: the
+working tree always matches the working tree, and a `HEAD`-tracking rev always
+matches another. Committing in the middle of a review keeps you in the same
+draft.
+
+`:DiffviewReviewStart` gives you explicit control. With no arguments it reviews
+whatever diff view you're in. With arguments it takes the same argument list as
+`:DiffviewOpen`, reusing the current tabpage when those arguments resolve to
+the same diff and opening a new one otherwise. Use `:DiffviewReviewStart!` to
+start a second, independent draft of a diff you already have one for.
+
+For more info, see `:h :DiffviewReviewStart`.
+
 ## Usage
 
 ### `:DiffviewOpen [git rev] [options] [ -- {paths...}]`
@@ -121,6 +167,22 @@ You can stage individual hunks by editing any buffer that represents the index
 will have the index buffer on the left side, and the entries under "Staged
 changes" will have it on the right side). Once you write to an index buffer the
 index will be updated.
+
+### `:DiffviewReviewStart[!] [git rev] [options] [ -- {paths...}]`
+
+Start a review session. With no arguments this reviews the current Diffview,
+or opens one against the index if none is running. With arguments it accepts
+the same argument list as `:DiffviewOpen`, reusing the current Diffview when
+those arguments resolve to the same diff, and opening a new one otherwise.
+
+If a draft already covers that diff it is resumed along with its comments.
+Use `!` to start a new draft instead.
+
+Related commands:
+
+- `:DiffviewReviewComment`: Create or edit the comment on the current line,
+  starting a review session first if there isn't one.
+- `:DiffviewReviewSubmit`: Submit the active review with an optional body.
 
 ### `:[range]DiffviewFileHistory [paths] [options]`
 
@@ -261,6 +323,10 @@ require("diffview").setup({
       win_opts = {},
     },
   },
+  review_panel = {
+    height = 12,
+    win_opts = {},
+  },
   commit_log_panel = {
     win_config = {},  -- See |diffview-config-win_config|
   },
@@ -283,6 +349,7 @@ require("diffview").setup({
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
       { "n", "<leader>e",   actions.focus_files,                    { desc = "Bring focus to the file panel" } },
       { "n", "<leader>b",   actions.toggle_files,                   { desc = "Toggle the file panel." } },
+      { "n", "<leader>rc",  actions.review_comment,                 { desc = "Comment on the current line in a review" } },
       { "n", "g<C-x>",      actions.cycle_layout,                   { desc = "Cycle through available layouts." } },
       { "n", "[x",          actions.prev_conflict,                  { desc = "In the merge-tool: jump to the previous conflict" } },
       { "n", "]x",          actions.next_conflict,                  { desc = "In the merge-tool: jump to the next conflict" } },
@@ -396,6 +463,12 @@ require("diffview").setup({
       { "n", "<leader>b",     actions.toggle_files,                { desc = "Toggle the file panel" } },
       { "n", "g<C-x>",        actions.cycle_layout,                { desc = "Cycle available layouts" } },
       { "n", "g?",            actions.help("file_history_panel"),  { desc = "Open the help panel" } },
+    },
+    review_session_panel = {
+      { "n", "<cr>",      actions.review_session_activate, { desc = "Jump to the comment / run the action under the cursor" } },
+      { "n", "s",         actions.review_submit,           { desc = "Submit the current review" } },
+      { "n", "q",         actions.review_leave,            { desc = "Leave review mode" } },
+      { "n", "<leader>e", actions.focus_files,             { desc = "Bring focus to the file panel" } },
     },
     option_panel = {
       { "n", "<tab>", actions.select_entry,          { desc = "Change the current option" } },

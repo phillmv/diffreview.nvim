@@ -16,15 +16,15 @@ local M = {}
 ---@type View[]
 M.views = {}
 
-function M.diffview_open(args)
+---Resolve a set of `:DiffviewOpen` arguments into everything needed to build a
+---`DiffView`, without building one. Split out from `diffview_open()` so that
+---callers can compare a set of arguments against an already-open view.
+---@param args string[]
+---@return DiffViewSpec?
+function M.resolve_diffview_spec(args)
   local default_args = config.get_config().default_args.DiffviewOpen
   local argo = arg_parser.parse(utils.flatten({ default_args, args }))
   local rev_arg = argo.args[1]
-
-  logger:info("[command call] :DiffviewOpen " .. table.concat(utils.flatten({
-    default_args,
-    args,
-  }), " "))
 
   local err, adapter = vcs.get_adapter({
     cmd_ctx = {
@@ -46,14 +46,28 @@ function M.diffview_open(args)
     return
   end
 
-  local v = DiffView({
+  return {
     adapter = adapter,
     rev_arg = rev_arg,
     path_args = adapter.ctx.path_args,
     left = opts.left,
     right = opts.right,
     options = opts.options,
-  })
+  }
+end
+
+---@class DiffViewSpec
+---@field adapter VCSAdapter
+---@field rev_arg? string
+---@field path_args string[]
+---@field left Rev
+---@field right Rev
+---@field options DiffViewOptions
+
+---@param spec DiffViewSpec
+---@return DiffView?
+function M.diffview_from_spec(spec)
+  local v = DiffView(spec)
 
   if not v:is_valid() then
     return
@@ -63,6 +77,20 @@ function M.diffview_open(args)
   logger:debug("DiffView instantiation successful!")
 
   return v
+end
+
+function M.diffview_open(args)
+  local default_args = config.get_config().default_args.DiffviewOpen
+
+  logger:info("[command call] :DiffviewOpen " .. table.concat(utils.flatten({
+    default_args,
+    args,
+  }), " "))
+
+  local spec = M.resolve_diffview_spec(args)
+  if not spec then return end
+
+  return M.diffview_from_spec(spec)
 end
 
 ---@param range? { [1]: integer, [2]: integer }

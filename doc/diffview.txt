@@ -367,6 +367,85 @@ COMMANDS                                        *diffview-commands*
         --exclude={pattern}
                 Exclude commits touching files as specified in the {pattern}.
 
+                                                *:DiffviewReviewStart*
+:DiffviewReviewStart[!] [git-rev] [options] [ -- {paths...}]
+
+        Start a review session. Reviews let you attach line comments to a diff
+        and collect them into a Markdown document, entirely locally.
+
+        Called with no arguments while a Diffview is open, this reviews
+        whatever that Diffview is currently showing. Otherwise it accepts the
+        same argument list as |:DiffviewOpen|: if those arguments resolve to
+        the same diff as the current Diffview, that Diffview is reused;
+        otherwise a new one is opened in a new tabpage.
+
+        A review is identified by the diff it covers: the git top-level, both
+        revisions, and any {paths...}. If a draft already covers that diff it
+        is resumed, along with its comments. Use `!` to start a new draft
+        instead of resuming.
+
+        Two revisions deliberately compare as stable targets, so that a draft
+        survives ordinary work: the working tree always matches the working
+        tree, and a rev that tracks `HEAD` always matches one that tracks
+        `HEAD`. Committing partway through a review therefore keeps you in the
+        same draft.
+
+        Examples: >vim
+            " Review the current Diffview, or the index if none is open
+            :DiffviewReviewStart
+
+            " Review a range, opening a Diffview for it if necessary
+            :DiffviewReviewStart origin/main...HEAD
+
+            " Review only part of the tree
+            :DiffviewReviewStart HEAD~4 -- lua/
+
+            " Start a second, independent draft of the same diff
+            :DiffviewReviewStart!
+<
+
+                                                *:DiffviewReviewComment*
+:DiffviewReviewComment  Create a comment on the line under the cursor, or edit
+                        the comment already there. Must be called from a diff
+                        buffer.
+
+                        If the current Diffview has no review session, one is
+                        started first, exactly as |:DiffviewReviewStart| with
+                        no arguments would.
+
+                        The comment is written in a floating buffer. Write the
+                        buffer (|:write|) to save it; empty comments are
+                        rejected. Saved comments are shown as virtual text at
+                        the end of the commented line, and listed in the review
+                        session panel below the file panel.
+
+                        Comments record the file, side, line, and the unified
+                        diff hunk they were made against.
+
+                                                *:DiffviewReviewSubmit*
+:DiffviewReviewSubmit   Submit the active review. Opens a floating buffer for
+                        an optional overall review body: write it, then close
+                        the window to submit. Closing without writing, or with
+                        unsaved changes, cancels.
+
+                        Submitting renders the review to Markdown and leaves
+                        review mode. The draft is moved to
+                        `<git-dir>/diffview-review/submitted/{review-id}/`, and
+                        a copy of the rendered document is written to
+                        `<git-dir>/diffview-review/latest.md`. Nothing is
+                        pushed anywhere; it's yours to do what you like with: >sh
+
+                            git_dir="$(git rev-parse --absolute-git-dir)" &&
+                              cat "$git_dir/diffview-review/latest.md"
+<
+                        Resolve the git directory like this rather than
+                        assuming `.git`, so that it works in linked worktrees.
+
+                        Leaving review mode without submitting (`q` in the
+                        session panel, or |diffview-actions-review_leave|)
+                        keeps the draft, which the next
+                        |:DiffviewReviewStart| for the same diff will resume.
+
                                                 *:DiffviewClose*
 :DiffviewClose          Close the active Diffview.
 
@@ -1121,6 +1200,35 @@ refresh_files                                   *diffview-actions-refresh_files*
         Contexts: `view`, `panel`
 
         Update stats and entries in the file list.
+
+review_comment                                  *diffview-actions-review_comment*
+        Contexts: `view`
+
+        Create or edit the review comment on the line under the cursor. Starts
+        a review session first if there isn't one. See
+        |:DiffviewReviewComment|.
+
+review_leave                                    *diffview-actions-review_leave*
+        Contexts: `view`, `panel`
+
+        Leave review mode, keeping the current draft.
+
+review_session_activate         *diffview-actions-review_session_activate*
+        Contexts: `panel`
+
+        In the review session panel: jump to the comment under the cursor, or
+        run the action under the cursor.
+
+review_start                                    *diffview-actions-review_start*
+        Contexts: `view`, `panel`
+
+        Start a review of the current diff view, resuming a draft that covers
+        the same diff if one exists. See |:DiffviewReviewStart|.
+
+review_submit                                   *diffview-actions-review_submit*
+        Contexts: `view`, `panel`
+
+        Submit the active review. See |:DiffviewReviewSubmit|.
 
 restore_entry                                   *diffview-actions-restore_entry*
         Contexts: `view`, `panel`

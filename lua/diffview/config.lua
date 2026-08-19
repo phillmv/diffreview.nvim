@@ -106,6 +106,10 @@ M.defaults = {
       win_opts = {}
     },
   },
+  review_panel = {
+    height = 12,
+    win_opts = {},
+  },
   commit_log_panel = {
     win_config = {
       win_opts = {}
@@ -131,6 +135,7 @@ M.defaults = {
       { "n", "<C-w>gf",     actions.goto_file_tab,                  { desc = "Open the file in a new tabpage" } },
       { "n", "<leader>e",   actions.focus_files,                    { desc = "Bring focus to the file panel" } },
       { "n", "<leader>b",   actions.toggle_files,                   { desc = "Toggle the file panel." } },
+      { "n", "<leader>rc",  actions.review_comment,                 { desc = "Comment on the current line in a review" } },
       { "n", "g<C-x>",      actions.cycle_layout,                   { desc = "Cycle through available layouts." } },
       { "n", "[x",          actions.prev_conflict,                  { desc = "In the merge-tool: jump to the previous conflict" } },
       { "n", "]x",          actions.next_conflict,                  { desc = "In the merge-tool: jump to the next conflict" } },
@@ -245,6 +250,12 @@ M.defaults = {
       { "n", "<leader>b",     actions.toggle_files,                { desc = "Toggle the file panel" } },
       { "n", "g<C-x>",        actions.cycle_layout,                { desc = "Cycle available layouts" } },
       { "n", "g?",            actions.help("file_history_panel"),  { desc = "Open the help panel" } },
+    },
+    review_session_panel = {
+      { "n", "<cr>",      actions.review_session_activate, { desc = "Jump to the comment / run the action under the cursor" } },
+      { "n", "s",         actions.review_submit,           { desc = "Submit the current review" } },
+      { "n", "q",         actions.review_leave,            { desc = "Leave review mode" } },
+      { "n", "<leader>e", actions.focus_files,             { desc = "Bring focus to the file panel" } },
     },
     option_panel = {
       { "n", "<tab>", actions.select_entry,          { desc = "Change the current option" } },

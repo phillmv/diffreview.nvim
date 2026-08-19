@@ -45,6 +45,7 @@ local M = {}
 ---@field merge_ctx? vcs.MergeContext
 ---@field initialized boolean
 ---@field valid boolean
+---@field review_session? ReviewSession
 ---@field watcher uv_fs_poll_t # UV fs poll handle.
 local DiffView = oop.create_class("DiffView", StandardView.__get())
 
@@ -118,6 +119,10 @@ end
 ---@param old_entry FileEntry
 ---@diagnostic disable-next-line: unused-local
 function DiffView:file_open_post(e, new_entry, old_entry)
+  if self.review_session then
+    self.review_session:annotate(new_entry)
+  end
+
   if new_entry.layout:is_nulled() then return end
   if new_entry.kind == "conflicting" then
     local file = new_entry.layout:get_main_win().file
@@ -172,6 +177,11 @@ end
 function DiffView:close()
   if not self.closing:check() then
     self.closing:send()
+
+    if self.review_session then
+      self.review_session:clear_annotations()
+      self.review_session = nil
+    end
 
     if self.watcher then
       self.watcher:stop()
