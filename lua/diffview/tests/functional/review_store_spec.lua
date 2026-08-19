@@ -1,0 +1,242 @@
+local eq = require("diffview.tests.helpers").eq
+local ReviewStore = require("diffview.review.store").ReviewStore
+
+local A = string.rep("a", 40)
+local B = string.rep("b", 40)
+
+describe("ReviewStore", function()
+  local root
+  local store
+
+  before_each(function()
+    root = vim.fn.tempname()
+    vim.fn.mkdir(root, "p")
+    store = ReviewStore(root)
+  end)
+
+  after_each(function()
+    vim.fn.delete(root, "rf")
+  end)
+
+  local function scope(opt)
+    opt = opt or {}
+    return {
+      label = "aaaaaaa..WORKING TREE",
+      toplevel = opt.toplevel or "/repo",
+      left = { kind = "commit", oid = opt.oid or A },
+      right = { kind = "local" },
+      path_args = opt.path_args or {},
+    }
+  end
+
+  it("retains earlier drafts when creating another", function()
+    local first = assert(store:create(scope()))
+    local second = assert(store:create(scope()))
+
+    local drafts = store:list_drafts()
+    eq(2, #drafts)
+    eq(second.review_id, drafts[1].review_id)
+    eq(first.review_id, drafts[2].review_id)
+  end)
+
+  describe("find_draft()", function()
+    it("finds a draft covering the same scope", function()
+      local review = assert(store:create(scope()))
+      local found = assert(store:find_draft(scope()))
+
+      eq(review.review_id, found.review_id)
+    end)
+
+    it("ignores drafts covering a different scope", function()
+      assert(store:create(scope()))
+
+      eq(nil, store:find_draft(scope({ oid = B })))
+      eq(nil, store:find_draft(scope({ path_args = { "lua" } })))
+      eq(nil, store:find_draft(scope({ toplevel = "/other" })))
+    end)
+
+    it("returns the most recent matching draft", function()
+      assert(store:create(scope()))
+      local second = assert(store:create(scope()))
+
+      eq(second.review_id, store:find_draft(scope()).review_id)
+    end)
+
+    it("ignores submitted reviews", function()
+      local review = assert(store:create(scope()))
+      assert(store:submit(review, "Done."))
+
+      eq(nil, store:find_draft(scope()))
+    end)
+
+    -- One hand-edited or half-written manifest must not take the whole
+    -- feature down with it.
+    it("skips unusable manifests without erroring", function()
+      local good = assert(store:create(scope()))
+
+      local function write_draft(id, manifest)
+        local dir = store:review_dir("draft", id)
+        vim.fn.mkdir(dir, "p")
+        vim.fn.writefile(vim.split(manifest, "\n", { plain = true }), dir .. "/review.json")
+      end
+
+      write_draft("bad-no-scope", '{"schema_version":1,"review_id":"bad-no-scope","state":"draft"}')
+      write_draft("bad-no-left",
+        '{"schema_version":1,"review_id":"bad-no-left","state":"draft",'
+        .. '"scope":{"toplevel":"/repo","right":{"kind":"local"}}}')
+      write_draft("bad-future",
+        '{"schema_version":99,"review_id":"bad-future","state":"draft",'
+        .. '"scope":{"toplevel":"/repo","left":{"kind":"commit","oid":"' .. A
+        .. '"},"right":{"kind":"local"}}}')
+      write_draft("bad-truncated", '{"schema_version":1,"review_id":')
+
+      local ok, drafts = pcall(store.list_drafts, store)
+      assert.is_true(ok, "list_drafts threw: " .. tostring(drafts))
+      eq(1, #drafts)
+      eq(good.review_id, drafts[1].review_id)
+
+      local found
+      ok, found = pcall(store.find_draft, store, scope())
+      assert.is_true(ok, "find_draft threw: " .. tostring(found))
+      eq(good.review_id, found.review_id)
+    end)
+  end)
+
+  it("persists comments independently and renders a submission", function()
+    local review = assert(store:create(scope()))
+    local first = {
+      body = "Use the asynchronous API.",
+      location = {
+        path = "lua/review.lua",
+        side = "right",
+        line = 12,
+        selected_text = "local value = sync()",
+        content_oid = "sha256:abc",
+      },
+      diff_hunk = {
+        format = "unified",
+        context_lines = 3,
+        text = "@@ -12 +12 @@\n-local value = old()\n+local value = sync()",
+      },
+    }
+    local second = {
+      body = "Keep the old name.",
+      location = {
+        path = "lua/review.lua",
+        side = "left",
+        line = 4,
+        selected_text = "local old_name",
+        content_oid = "sha256:def",
+      },
+      diff_hunk = {
+        format = "unified",
+        context_lines = 3,
+        text = "@@ -4 +4 @@\n-local old_name\n+local new_name",
+      },
+    }
+
+    assert(store:save_comment(review, first))
+    assert(store:save_comment(review, second))
+    local comments = assert(store:load_comments(review))
+    eq(2, #comments)
+    assert.not_equals(comments[1].comment_id, comments[2].comment_id)
+
+    local submitted = assert(store:submit(review, "Overall review body."))
+    eq("submitted", submitted.state)
+    eq(false, vim.loop.fs_stat(store:review_dir("draft", review.review_id)) ~= nil)
+    eq(true, vim.loop.fs_stat(store:review_dir("submitted", review.review_id)) ~= nil)
+
+    local markdown = table.concat(vim.fn.readfile(
+      store:review_dir("submitted", review.review_id) .. "/review.md"
+    ), "\n")
+    assert.matches("# Submitted Diffview Review", markdown)
+    assert.matches("Comparing: `aaaaaaaaa` %(before%) %-> `WORKING TREE` %(after%)", markdown)
+    assert.matches("Comments: 2 %(C1%-C2%)", markdown)
+    assert.matches("Overall review body", markdown)
+    -- Numbered in document order: path, then side, then line.
+    assert.matches("### C1 %- Before, line 4", markdown)
+    assert.matches("### C2 %- After, line 12", markdown)
+    assert.matches("```diff", markdown)
+    assert.matches("Use the asynchronous API", markdown)
+    eq(markdown, table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n"))
+  end)
+
+  it("re-saving a comment updates it in place", function()
+    local review = assert(store:create(scope()))
+    local comment = {
+      body = "First take.",
+      location = { path = "a.lua", side = "right", line = 1 },
+      diff_hunk = { format = "unified", context_lines = 3, text = "@@ -1 +1 @@" },
+    }
+
+    assert(store:save_comment(review, comment))
+    comment.body = "Second take."
+    assert(store:save_comment(review, comment))
+
+    local comments = assert(store:load_comments(review))
+    eq(1, #comments)
+    eq("Second take.", comments[1].body)
+  end)
+
+  -- The IDs exist so a review can be discussed: "why didn't you do C3?".
+  it("numbers comments sequentially in document order", function()
+    local review = assert(store:create(scope()))
+
+    local function comment(path, side, line, body)
+      return {
+        body = body,
+        location = { path = path, side = side, line = line },
+        diff_hunk = { format = "unified", context_lines = 3, text = "@@ -1 +1 @@" },
+      }
+    end
+
+    -- Saved out of order; the document decides the numbering.
+    assert(store:save_comment(review, comment("z.lua", "right", 5, "last file")))
+    assert(store:save_comment(review, comment("a.lua", "right", 30, "later line")))
+    assert(store:save_comment(review, comment("a.lua", "right", 2, "earlier line")))
+    assert(store:save_comment(review, comment("a.lua", "left", 9, "old side")))
+
+    assert(store:submit(review, ""))
+    local markdown = table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n")
+
+    local ids = {}
+    for id, side, line in markdown:gmatch("### (C%d+) %- (%a+), line (%d+)") do
+      ids[#ids + 1] = ("%s:%s:%s"):format(id, side, line)
+    end
+
+    eq({
+      "C1:Before:9",
+      "C2:After:2",
+      "C3:After:30",
+      "C4:After:5",
+    }, ids)
+    assert.matches("Comments: 4 %(C1%-C4%)", markdown)
+  end)
+
+  it("summarises a single comment without a range", function()
+    local review = assert(store:create(scope()))
+    assert(store:save_comment(review, {
+      body = "Only one.",
+      location = { path = "a.lua", side = "right", line = 1 },
+      diff_hunk = { format = "unified", context_lines = 3, text = "@@ -1 +1 @@" },
+    }))
+    assert(store:submit(review, ""))
+
+    local markdown = table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n")
+    assert.matches("Comments: 1 %(C1%)", markdown)
+  end)
+
+  it("updates the latest review without removing earlier submissions", function()
+    local first = assert(store:create(scope()))
+    assert(store:submit(first, "First review."))
+
+    local second = assert(store:create(scope()))
+    assert(store:submit(second, "Second review."))
+
+    eq(true, vim.loop.fs_stat(store:review_dir("submitted", first.review_id)) ~= nil)
+    eq(true, vim.loop.fs_stat(store:review_dir("submitted", second.review_id)) ~= nil)
+    local latest = table.concat(vim.fn.readfile(store.root .. "/latest.md"), "\n")
+    assert.matches("Second review", latest)
+    assert.not_matches("First review", latest)
+  end)
+end)

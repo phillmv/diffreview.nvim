@@ -7,7 +7,10 @@ local lazy = require("diffview.lazy")
 
 local arg_parser = lazy.require("diffview.arg_parser") ---@module "diffview.arg_parser"
 local config = lazy.require("diffview.config") ---@module "diffview.config"
+local DiffView = lazy.access("diffview.scene.views.diff.diff_view", "DiffView") ---@type DiffView|LazyModule
 local lib = lazy.require("diffview.lib") ---@module "diffview.lib"
+local review = lazy.require("diffview.review.session") ---@module "diffview.review.session"
+local review_scope = lazy.require("diffview.review.scope") ---@module "diffview.review.scope"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs = lazy.require("diffview.vcs") ---@module "diffview.vcs"
 
@@ -142,6 +145,83 @@ function M.file_history(range, args)
   end
 end
 
+---@return DiffView?
+local function current_diff_view()
+  local view = lib.get_current_view()
+
+  if view and view:instanceof(DiffView.__get()) then
+    ---@cast view DiffView
+    return view
+  end
+end
+
+---Start a review session.
+---
+---With no arguments this reviews whatever the current `DiffviewOpen` is
+---showing. With arguments it accepts the same argument list as
+---`:DiffviewOpen`, reusing the current view when those arguments resolve to
+---the same diff, and opening a new one otherwise.
+---@param args string[]
+---@param force_new? boolean Start a new draft even if one already covers this diff.
+function M.review_start(args, force_new)
+  logger:info("[command call] :DiffviewReviewStart" .. (force_new and "! " or " ")
+    .. table.concat(args, " "))
+
+  local view = current_diff_view()
+
+  if #args == 0 and view then
+    review.start(view, force_new)
+    return
+  end
+
+  local spec = lib.resolve_diffview_spec(args)
+  if not spec then return end
+
+  if view then
+    local target = review_scope.encode({
+      adapter = spec.adapter,
+      left = spec.left,
+      right = spec.right,
+      path_args = spec.path_args,
+    })
+
+    if review_scope.same(target, review.scope_of(view)) then
+      review.start(view, force_new)
+      return
+    end
+  end
+
+  view = lib.diffview_from_spec(spec)
+  if not view then return end
+
+  view:open()
+  review.start(view, force_new)
+end
+
+---Comment on the line under the cursor, starting a review session first if the
+---current view doesn't have one.
+function M.review_comment()
+  local view = current_diff_view()
+
+  if not view then
+    utils.err("Review comments must be created from a diff view.")
+    return
+  end
+
+  review.comment(view)
+end
+
+function M.review_submit()
+  local view = current_diff_view()
+
+  if not view then
+    utils.err("No review session is active.")
+    return
+  end
+
+  review.submit(view)
+end
+
 function M.close(tabpage)
   if tabpage then
     vim.schedule(function()
@@ -160,6 +240,9 @@ end
 function M.completion(_, cmd_line, cur_pos)
   local ctx = arg_parser.scan(cmd_line, { cur_pos = cur_pos, allow_ex_range = true })
   local cmd = ctx.args[1]
+
+  -- Commands that take a bang show up here with it still attached.
+  if cmd then cmd = (cmd:gsub("!$", "")) end
 
   if cmd and M.completers[cmd] then
     return arg_parser.process_candidates(M.completers[cmd](ctx), ctx)
@@ -241,6 +324,9 @@ M.completers = {
     return candidates
   end,
 }
+
+-- `:DiffviewReviewStart` takes the same arguments as `:DiffviewOpen`.
+M.completers.DiffviewReviewStart = M.completers.DiffviewOpen
 
 function M.update_colors()
   hl.setup()

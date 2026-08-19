@@ -4,6 +4,7 @@ local lazy = require("diffview.lazy")
 local EventName = lazy.access("diffview.events", "EventName") ---@type EventName|LazyModule
 local RevType = lazy.access("diffview.vcs.rev", "RevType") ---@type RevType|LazyModule
 local actions = lazy.require("diffview.actions") ---@module "diffview.actions"
+local review = lazy.require("diffview.review.session") ---@module "diffview.review.session"
 local utils = lazy.require("diffview.utils") ---@module "diffview.utils"
 local vcs_utils = lazy.require("diffview.vcs.utils") ---@module "diffview.vcs.utils"
 
@@ -328,6 +329,23 @@ return function(view)
       if not view.panel:is_focused() then return end
       local dir = view.panel:get_dir_at_cursor()
       if dir then view.panel:toggle_item_fold(dir) end
+    end,
+    review_start = function()
+      review.start(view)
+    end,
+    review_comment = function()
+      review.comment(view)
+    end,
+    review_submit = function()
+      review.submit(view)
+    end,
+    review_leave = function()
+      review.leave(view)
+    end,
+    review_session_activate = function()
+      if view.review_session then
+        view.review_session:activate_panel_item()
+      end
     end,
   }
 end
