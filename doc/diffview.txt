@@ -415,8 +415,11 @@ COMMANDS                                        *diffview-commands*
 
                         The comment is written in a split below the diff, in
                         the style of `COMMIT_EDITMSG`: |:wq| saves and closes,
-                        and |:q!| discards. Quitting with an empty buffer
-                        cancels the comment.
+                        and |:q!| discards.
+
+                        An empty buffer means "no comment here": saving one
+                        deletes the comment if it already existed, and
+                        otherwise abandons the new one.
 
                         Saved comments are shown as virtual text at the end of
                         the commented line, and listed in the review session

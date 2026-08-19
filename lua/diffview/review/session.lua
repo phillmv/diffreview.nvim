@@ -224,6 +224,7 @@ end
 function ReviewSession:open_comment_editor(comment)
   local location = comment.location
   local restore = capture_layout(self.view)
+  local existing = comment.comment_id ~= nil
 
   Editor.open({
     title = ("%s:%d [%s]"):format(
@@ -231,6 +232,9 @@ function ReviewSession:open_comment_editor(comment)
       location.line,
       location.side == "left" and "left" or "right"
     ),
+    hint = existing
+      and ":wq to save  ·  empty to delete  ·  :q! to cancel"
+      or ":wq to save  ·  :q! or empty to cancel",
     lines = vim.split(comment.body or "", "\n", { plain = true }),
     on_write = function(lines)
       if not self:is_active() then
@@ -238,7 +242,24 @@ function ReviewSession:open_comment_editor(comment)
         return false
       end
 
-      -- The editor cancels on an empty buffer, so this only runs with content.
+      -- Emptying the buffer removes an existing comment, and abandons one that
+      -- was never saved in the first place.
+      if vim.trim(table.concat(lines, "\n")) == "" then
+        if not comment.comment_id then return true end
+
+        local deleted, delete_err = self.store:delete_comment(self.review, comment)
+
+        if not deleted then
+          utils.err("Failed to delete review comment: " .. delete_err)
+          return false
+        end
+
+        comment.comment_id = nil
+        utils.info("Deleted the comment.")
+
+        return self:reload_comments()
+      end
+
       comment.body = table.concat(lines, "\n")
       local ok, err = self.store:save_comment(self.review, comment)
 
@@ -354,9 +375,9 @@ function ReviewSession:open_submit_editor()
 
   Editor.open({
     title = ("Submit review (%d comments)"):format(#self.comments),
+    hint = ":wq to submit  ·  :q! to cancel",
     lines = { "" },
     -- The overall body is optional; a review can be just its line comments.
-    allow_empty = true,
     on_write = function()
       if not self:is_active() then
         utils.err("This review is no longer active; it was not submitted.")

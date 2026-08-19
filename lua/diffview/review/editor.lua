@@ -6,25 +6,18 @@ local next_id = 0
 
 ---@class ReviewEditorOptions
 ---@field title string # Shown in the editor's winbar.
+---@field hint? string # Key hints for the winbar.
 ---@field lines? string[]
 ---@field filetype? string
----@field allow_empty? boolean # Permit saving an empty body. Defaults to false.
 ---@field on_write fun(lines: string[]): boolean?
 ---@field on_submit? fun(lines: string[])
 ---@field on_close? fun() # Runs once the window has gone and the layout settled.
 
----@param lines string[]
----@return boolean
-local function is_blank(lines)
-  return vim.trim(table.concat(lines, "\n")) == ""
-end
-
 ---Open a scratch buffer in a split below the diff, in the style of
----`COMMIT_EDITMSG`: write it to save, and quit without content to cancel.
+---`COMMIT_EDITMSG`: write it to save, and quit to close.
 ---
----`:wq` therefore saves and closes, `:q!` discards, and `:wq` on an empty
----buffer cancels — unless `allow_empty` is set, in which case an empty body
----is saved as-is.
+---`on_write` decides what a given body means, including an empty one, and
+---returns false to refuse the write and keep the buffer open.
 ---
 ---When `on_submit` is given it runs once the window closes, provided the
 ---buffer was last written successfully and has no unsaved edits.
@@ -55,8 +48,7 @@ function M.open(opt)
   vim.wo[winid].spell = true
   vim.wo[winid].winfixheight = true
 
-  local hint = opt.allow_empty and ":wq to submit  ·  :q! to cancel"
-    or ":wq to save  ·  :q! or an empty buffer to cancel"
+  local hint = opt.hint or ":wq to save  ·  :q! to cancel"
   local banner = ("  %s  ·  %s"):format(opt.title, hint)
 
   if vim.fn.has("nvim-0.8") == 1 then
@@ -70,15 +62,6 @@ function M.open(opt)
     buffer = bufnr,
     callback = function()
       local lines = api.nvim_buf_get_lines(bufnr, 0, -1, false)
-
-      -- An empty buffer means "I changed my mind": let the write succeed so
-      -- that `:wq` can close, but record nothing.
-      if is_blank(lines) and not opt.allow_empty then
-        last_write = nil
-        vim.bo[bufnr].modified = false
-        return
-      end
-
       local ok = opt.on_write(lines)
       if ok == false then return end
       last_write = lines

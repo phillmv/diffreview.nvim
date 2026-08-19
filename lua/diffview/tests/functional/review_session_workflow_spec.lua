@@ -320,6 +320,110 @@ describe("Review sessions on a diff view", function()
     end
   end)
 
+  describe("deleting a comment", function()
+    it("removes it when the buffer is emptied", function()
+      local view, win = open()
+
+      diffview.review_comment()
+      write_editor("Delete me.")
+
+      local session = assert(view.review_session)
+      assert.equals(1, #session.comments)
+      assert.equals(1, #assert(session.store:load_comments(session.review)))
+
+      -- Re-open the comment and clear it.
+      win:focus()
+      api.nvim_win_set_cursor(win.id, { 1, 0 })
+      diffview.review_comment()
+      api.nvim_buf_set_lines(0, 0, -1, false, { "" })
+      vim.cmd("wq")
+
+      assert.equals(0, #view.review_session.comments)
+      assert.equals(0, #assert(session.store:load_comments(session.review)))
+      assert.equals(
+        0,
+        #api.nvim_buf_get_extmarks(win.file.bufnr, review.annotation_ns, 0, -1, {})
+      )
+    end)
+
+    it("treats a whitespace-only buffer as empty", function()
+      local view, win = open()
+
+      diffview.review_comment()
+      write_editor("Delete me too.")
+
+      win:focus()
+      api.nvim_win_set_cursor(win.id, { 1, 0 })
+      diffview.review_comment()
+      api.nvim_buf_set_lines(0, 0, -1, false, { "   ", "", "\t" })
+      vim.cmd("wq")
+
+      assert.equals(0, #view.review_session.comments)
+    end)
+
+    it("leaves the line free for a new comment afterwards", function()
+      local view, win = open()
+
+      diffview.review_comment()
+      write_editor("First attempt.")
+
+      win:focus()
+      api.nvim_win_set_cursor(win.id, { 1, 0 })
+      diffview.review_comment()
+      api.nvim_buf_set_lines(0, 0, -1, false, { "" })
+      vim.cmd("wq")
+      assert.equals(0, #view.review_session.comments)
+
+      win:focus()
+      api.nvim_win_set_cursor(win.id, { 1, 0 })
+      diffview.review_comment()
+      -- The editor must start empty, not pre-filled with the deleted body.
+      assert.same({ "" }, api.nvim_buf_get_lines(0, 0, -1, false))
+      write_editor("Second attempt.")
+
+      assert.equals(1, #view.review_session.comments)
+      assert.equals("Second attempt.", view.review_session.comments[1].body)
+    end)
+
+    it("can be undone by typing again in the same editor", function()
+      local view, win = open()
+
+      diffview.review_comment()
+      write_editor("Original.")
+
+      win:focus()
+      api.nvim_win_set_cursor(win.id, { 1, 0 })
+      diffview.review_comment()
+
+      -- Empty it and save without closing: the comment goes.
+      api.nvim_buf_set_lines(0, 0, -1, false, { "" })
+      vim.cmd("write")
+      assert.equals(0, #view.review_session.comments)
+
+      -- Then think better of it, in the same editor.
+      api.nvim_buf_set_lines(0, 0, -1, false, { "Rewritten." })
+      vim.cmd("wq")
+
+      local session = assert(view.review_session)
+      assert.equals(1, #session.comments)
+      assert.equals("Rewritten.", session.comments[1].body)
+      assert.equals(1, #assert(session.store:load_comments(session.review)))
+    end)
+
+    it("does nothing when a never-saved comment is left empty", function()
+      local view = open()
+
+      diffview.review_start({}, false)
+      local session = assert(view.review_session)
+
+      diffview.review_comment()
+      vim.cmd("wq")
+
+      assert.equals(0, #view.review_session.comments)
+      assert.equals(0, #assert(session.store:load_comments(session.review)))
+    end)
+  end)
+
   -- Editor floats outlive the session that opened them.
   describe("an editor left open past its session", function()
     it("refuses to save a comment, and strands nothing", function()

@@ -91,9 +91,12 @@ Open a diff you want to review — anything `:DiffviewOpen` accepts works:
 
 Put the cursor on a changed line and run `:DiffviewReviewComment` (or
 `<leader>rc`). If no review is in progress, one starts automatically. A split
-opens below the diff: type the comment and `:wq` to save it, or `:q!` — or
-just leave it empty — to cancel. Commented lines are annotated with a preview,
-and every comment is listed in a session panel below the file panel.
+opens below the diff: type the comment and `:wq` to save it, or `:q!` to
+cancel. Commented lines are annotated with a preview, and every comment is
+listed in a session panel below the file panel.
+
+Running it again on a commented line reopens that comment for editing. Saving
+it empty deletes it.
 
 When you're done, `:DiffviewReviewSubmit` opens a split for an optional overall
 review body. `:wq` submits; the review is rendered to Markdown and stored under

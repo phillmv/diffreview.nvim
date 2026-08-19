@@ -281,6 +281,17 @@ end
 
 ---@param review table
 ---@param comment table
+---@return string
+function ReviewStore:comment_path(review, comment)
+  return pl:join(
+    self:review_dir("draft", review.review_id),
+    "comments",
+    comment.comment_id .. ".json"
+  )
+end
+
+---@param review table
+---@param comment table
 ---@return boolean? ok
 ---@return string? err
 function ReviewStore:save_comment(review, comment)
@@ -298,17 +309,34 @@ function ReviewStore:save_comment(review, comment)
       suffix = suffix + 1
     end
     comment.created_at = now
-    comment.schema_version = 1
+    comment.schema_version = SCHEMA_VERSION
   end
   comment.updated_at = now
 
-  local path = pl:join(
-    self:review_dir("draft", review.review_id),
-    "comments",
-    comment.comment_id .. ".json"
+  local ok, err = atomic_write(
+    self:comment_path(review, comment),
+    json_encode(comment) .. "\n"
   )
-  local ok, err = atomic_write(path, json_encode(comment) .. "\n")
   if not ok then return nil, err end
+  return self:save_review(review)
+end
+
+---Remove a comment from a draft. Deleting one that has already gone is not an
+---error, so that repeated writes of an emptied editor stay harmless.
+---@param review table
+---@param comment table
+---@return boolean? ok
+---@return string? err
+function ReviewStore:delete_comment(review, comment)
+  if not comment.comment_id then return true end
+
+  local path = self:comment_path(review, comment)
+
+  if pl:stat(path) then
+    local unlinked, unlink_err = uv.fs_unlink(path)
+    if not unlinked then return nil, unlink_err end
+  end
+
   return self:save_review(review)
 end
 
