@@ -1,4 +1,8 @@
-# Diffview.nvim
+# Diff(re)view.nvim
+
+Filipa's fork of diffview. Same as upstream except it introduces a set of `DiffviewReview*` commands for performing local code review with agents.
+
+---
 
 Single tabpage interface for easily cycling through diffs for all modified files
 for any git rev.
@@ -79,6 +83,9 @@ Get started by opening file history for:
 For more info, see `:h :DiffviewFileHistory`.
 
 ## Reviews
+
+![reviews](https://github.com/user-attachments/assets/bdcf879f-20cf-4e34-881e-fb3691dbff99)
+
 
 Reviews let you attach line comments to any diff and collect them into a
 Markdown document, without leaving nvim and without talking to a forge.
